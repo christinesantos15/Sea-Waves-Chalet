@@ -41,6 +41,11 @@ class Reservation(Base):
         ForeignKey("cottages.id"),
     )
 
+    room_id: Mapped[int | None] = mapped_column(
+        ForeignKey("rooms.id"),
+        nullable=True,
+    )
+
     inquiry_id: Mapped[int | None] = mapped_column(
         ForeignKey("inquiries.id"),
         nullable=True,

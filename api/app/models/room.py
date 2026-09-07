@@ -1,23 +1,42 @@
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Integer, Numeric, String, Text
+from sqlalchemy import (
+    Boolean,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
 
-class Cottage(Base):
-    __tablename__ = "cottages"
+class Room(Base):
+    __tablename__ = "rooms"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "cottage_id",
+            "code",
+            name="uq_rooms_cottage_code",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
     )
 
+    cottage_id: Mapped[int] = mapped_column(
+        ForeignKey("cottages.id"),
+        index=True,
+    )
+
     code: Mapped[str] = mapped_column(
         String(50),
-        unique=True,
-        index=True,
     )
 
     name: Mapped[str] = mapped_column(
@@ -47,14 +66,4 @@ class Cottage(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean,
         default=True,
-    )
-
-    map_x: Mapped[Decimal | None] = mapped_column(
-        Numeric(5, 2),
-        nullable=True,
-    )
-
-    map_y: Mapped[Decimal | None] = mapped_column(
-        Numeric(5, 2),
-        nullable=True,
     )
