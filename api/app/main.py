@@ -4,11 +4,12 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import engine
+from app.routers.inventory import router as inventory_router
 
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.2.0",
+    version="0.3.0",
 )
 
 
@@ -21,6 +22,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.include_router(inventory_router)
 
 
 @app.get("/")
