@@ -19,6 +19,9 @@ from app.schemas.reservation import (
     OperatorReservationDecision,
     OperatorReservationResponse,
 )
+from app.services.turnover import (
+    create_checkout_turnover_task,
+)
 
 
 router = APIRouter(
@@ -66,9 +69,21 @@ def build_operator_response(
         cottage_id=cottage.id,
         cottage_code=cottage.code,
         cottage_name=cottage.name,
-        room_id=room.id if room else None,
-        room_code=room.code if room else None,
-        room_name=room.name if room else None,
+        room_id=(
+            room.id
+            if room is not None
+            else None
+        ),
+        room_code=(
+            room.code
+            if room is not None
+            else None
+        ),
+        room_name=(
+            room.name
+            if room is not None
+            else None
+        ),
         source=reservation.source,
         status=reservation.status,
         check_in=reservation.check_in,
@@ -112,7 +127,9 @@ def get_operator_reservation_response(
         )
     )
 
-    row = db.execute(statement).first()
+    row = db.execute(
+        statement
+    ).first()
 
     if row is None:
         raise HTTPException(
@@ -403,6 +420,11 @@ def check_out_reservation(
             )
 
         reservation.status = "checked_out"
+
+        create_checkout_turnover_task(
+            db,
+            reservation,
+        )
 
         db.commit()
 
