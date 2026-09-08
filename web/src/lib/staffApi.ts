@@ -266,6 +266,7 @@ export async function getHousekeepingTasks(
     }`,
     {
       method: "GET",
+      credentials: "include",
       cache: "no-store",
     },
   );
@@ -289,6 +290,7 @@ export async function createHousekeepingTask(
     `${API_BASE_URL}/staff/housekeeping`,
     {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type":
           "application/json",
@@ -317,6 +319,7 @@ export async function updateHousekeepingStatus(
     `${API_BASE_URL}/staff/housekeeping/${taskId}/status`,
     {
       method: "PATCH",
+      credentials: "include",
       headers: {
         "Content-Type":
           "application/json",
@@ -361,6 +364,7 @@ export async function getMaintenanceIssues(
     }`,
     {
       method: "GET",
+      credentials: "include",
       cache: "no-store",
     },
   );
@@ -384,6 +388,7 @@ export async function createMaintenanceIssue(
     `${API_BASE_URL}/staff/maintenance`,
     {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type":
           "application/json",
@@ -412,6 +417,7 @@ export async function updateMaintenanceStatus(
     `${API_BASE_URL}/staff/maintenance/${issueId}/status`,
     {
       method: "PATCH",
+      credentials: "include",
       headers: {
         "Content-Type":
           "application/json",
