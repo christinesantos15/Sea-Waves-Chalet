@@ -35,6 +35,57 @@ export type OperatorReservation = {
   created_at: string;
 };
 
+export type OperatorPayment = {
+  id: number;
+  reservation_id: number;
+
+  amount: string;
+
+  payment_type: string;
+  payment_method: string | null;
+
+  status: string;
+
+  reference: string | null;
+  notes: string | null;
+
+  paid_at: string | null;
+  created_at: string;
+};
+
+export type OperatorPaymentStatus =
+  | "unpriced"
+  | "unpaid"
+  | "partial"
+  | "paid";
+
+export type OperatorPaymentSummary = {
+  reservation_id: number;
+  reservation_reference: string;
+
+  total_amount: string;
+  paid_amount: string;
+  balance: string;
+
+  payment_status: OperatorPaymentStatus;
+
+  payments: OperatorPayment[];
+};
+
+export type OperatorPaymentCreate = {
+  amount: string;
+
+  payment_type:
+    | "deposit"
+    | "balance"
+    | "full"
+    | "other";
+
+  payment_method: string | null;
+  reference: string | null;
+  notes: string | null;
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   "http://localhost:8001";
@@ -51,6 +102,20 @@ async function readError(
     typeof body.detail === "string"
   ) {
     return body.detail;
+  }
+
+  if (
+    body &&
+    Array.isArray(body.detail)
+  ) {
+    const firstError =
+      body.detail[0]?.msg;
+
+    if (
+      typeof firstError === "string"
+    ) {
+      return firstError;
+    }
   }
 
   return `Request failed: ${response.status}`;
@@ -107,5 +172,81 @@ export async function decideReservation(
 
   return response.json() as Promise<
     OperatorReservation
+  >;
+}
+
+export async function getReservationPayments(
+  reservationId: number,
+): Promise<OperatorPaymentSummary> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/reservations/${reservationId}/payments`,
+    {
+      method: "GET",
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorPaymentSummary
+  >;
+}
+
+export async function updateReservationAmount(
+  reservationId: number,
+  totalAmount: string,
+): Promise<OperatorPaymentSummary> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/reservations/${reservationId}/amount`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        total_amount: totalAmount,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorPaymentSummary
+  >;
+}
+
+export async function recordReservationPayment(
+  reservationId: number,
+  payment: OperatorPaymentCreate,
+): Promise<OperatorPaymentSummary> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/reservations/${reservationId}/payments`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payment),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorPaymentSummary
   >;
 }

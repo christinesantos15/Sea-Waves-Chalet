@@ -6,6 +6,8 @@ import {
   useState,
 } from "react";
 
+import OperatorPaymentPanel from "@/components/operator/OperatorPaymentPanel";
+
 import {
   decideReservation,
   getOperatorReservations,
@@ -18,25 +20,9 @@ type QueueStatus =
   | "confirmed"
   | "declined";
 
-const QUEUE_STATUSES: {
-  value: QueueStatus;
-  label: string;
-}[] = [
-  {
-    value: "pending",
-    label: "Pending",
-  },
-  {
-    value: "confirmed",
-    label: "Confirmed",
-  },
-  {
-    value: "declined",
-    label: "Declined",
-  },
-];
-
-function formatDate(value: string) {
+function formatDate(
+  value: string,
+) {
   const date = new Date(
     `${value}T00:00:00`,
   );
@@ -51,7 +37,9 @@ function formatDate(value: string) {
   ).format(date);
 }
 
-function formatCreatedAt(value: string) {
+function formatCreatedAt(
+  value: string,
+) {
   const date = new Date(value);
 
   return new Intl.DateTimeFormat(
@@ -90,25 +78,38 @@ function statusClasses(
 
 export default function OperatorReservationQueue() {
   const [activeStatus, setActiveStatus] =
-    useState<QueueStatus>("pending");
+    useState<QueueStatus>(
+      "pending",
+    );
 
-  const [reservations, setReservations] =
-    useState<OperatorReservation[]>([]);
+  const [
+    reservations,
+    setReservations,
+  ] = useState<
+    OperatorReservation[]
+  >([]);
 
-  const [counts, setCounts] = useState({
-    pending: 0,
-    confirmed: 0,
-    declined: 0,
-  });
+  const [counts, setCounts] =
+    useState({
+      pending: 0,
+      confirmed: 0,
+      declined: 0,
+    });
 
   const [loading, setLoading] =
     useState(true);
 
   const [error, setError] =
-    useState<string | null>(null);
+    useState<string | null>(
+      null,
+    );
 
-  const [actionReservationId, setActionReservationId] =
-    useState<number | null>(null);
+  const [
+    actionReservationId,
+    setActionReservationId,
+  ] = useState<number | null>(
+    null,
+  );
 
   const loadDashboard =
     useCallback(async () => {
@@ -133,29 +134,46 @@ export default function OperatorReservationQueue() {
         ]);
 
         setCounts({
-          pending: pending.length,
-          confirmed: confirmed.length,
-          declined: declined.length,
+          pending:
+            pending.length,
+          confirmed:
+            confirmed.length,
+          declined:
+            declined.length,
         });
 
-        if (activeStatus === "pending") {
-          setReservations(pending);
+        if (
+          activeStatus === "pending"
+        ) {
+          setReservations(
+            pending,
+          );
         }
 
         if (
-          activeStatus === "confirmed"
+          activeStatus ===
+          "confirmed"
         ) {
-          setReservations(confirmed);
+          setReservations(
+            confirmed,
+          );
         }
 
         if (
-          activeStatus === "declined"
+          activeStatus ===
+          "declined"
         ) {
-          setReservations(declined);
+          setReservations(
+            declined,
+          );
         }
       } catch (error) {
-        if (error instanceof Error) {
-          setError(error.message);
+        if (
+          error instanceof Error
+        ) {
+          setError(
+            error.message,
+          );
         } else {
           setError(
             "Could not load reservations.",
@@ -171,8 +189,11 @@ export default function OperatorReservationQueue() {
   }, [loadDashboard]);
 
   async function handleDecision(
-    reservation: OperatorReservation,
-    decision: "confirmed" | "declined",
+    reservation:
+      OperatorReservation,
+    decision:
+      | "confirmed"
+      | "declined",
   ) {
     try {
       setActionReservationId(
@@ -188,15 +209,21 @@ export default function OperatorReservationQueue() {
 
       await loadDashboard();
     } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message);
+      if (
+        error instanceof Error
+      ) {
+        setError(
+          error.message,
+        );
       } else {
         setError(
           "Could not update reservation.",
         );
       }
     } finally {
-      setActionReservationId(null);
+      setActionReservationId(
+        null,
+      );
     }
   }
 
@@ -206,10 +233,13 @@ export default function OperatorReservationQueue() {
         <button
           type="button"
           onClick={() =>
-            setActiveStatus("pending")
+            setActiveStatus(
+              "pending",
+            )
           }
           className={`rounded-2xl border p-5 text-left transition ${
-            activeStatus === "pending"
+            activeStatus ===
+            "pending"
               ? "border-amber-300 bg-amber-50"
               : "border-slate-200 bg-white hover:border-slate-300"
           }`}
@@ -230,10 +260,13 @@ export default function OperatorReservationQueue() {
         <button
           type="button"
           onClick={() =>
-            setActiveStatus("confirmed")
+            setActiveStatus(
+              "confirmed",
+            )
           }
           className={`rounded-2xl border p-5 text-left transition ${
-            activeStatus === "confirmed"
+            activeStatus ===
+            "confirmed"
               ? "border-emerald-300 bg-emerald-50"
               : "border-slate-200 bg-white hover:border-slate-300"
           }`}
@@ -254,10 +287,13 @@ export default function OperatorReservationQueue() {
         <button
           type="button"
           onClick={() =>
-            setActiveStatus("declined")
+            setActiveStatus(
+              "declined",
+            )
           }
           className={`rounded-2xl border p-5 text-left transition ${
-            activeStatus === "declined"
+            activeStatus ===
+            "declined"
               ? "border-red-300 bg-red-50"
               : "border-slate-200 bg-white hover:border-slate-300"
           }`}
@@ -284,7 +320,8 @@ export default function OperatorReservationQueue() {
             </p>
 
             <h2 className="mt-2 text-2xl font-semibold capitalize text-slate-950">
-              {activeStatus} reservations
+              {activeStatus}{" "}
+              reservations
             </h2>
           </div>
 
@@ -313,38 +350,47 @@ export default function OperatorReservationQueue() {
         {loading && (
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 text-center">
             <p className="text-sm text-slate-500">
-              Loading reservations...
+              Loading
+              reservations...
             </p>
           </div>
         )}
 
         {!loading &&
-          reservations.length === 0 && (
+          reservations.length ===
+            0 && (
             <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
               <p className="font-medium text-slate-800">
-                No {activeStatus} reservations
+                No {activeStatus}{" "}
+                reservations
               </p>
 
               <p className="mt-2 text-sm text-slate-500">
-                Reservations will appear here
-                when their status matches this
-                queue.
+                Reservations will
+                appear here when
+                their status matches
+                this queue.
               </p>
             </div>
           )}
 
         {!loading &&
-          reservations.length > 0 && (
+          reservations.length >
+            0 && (
             <div className="mt-6 space-y-4">
               {reservations.map(
-                (reservation) => {
+                (
+                  reservation,
+                ) => {
                   const actionPending =
                     actionReservationId ===
                     reservation.id;
 
                   return (
                     <article
-                      key={reservation.id}
+                      key={
+                        reservation.id
+                      }
                       className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -531,6 +577,15 @@ export default function OperatorReservationQueue() {
                             Decline
                           </button>
                         </div>
+                      )}
+
+                      {reservation.status ===
+                        "confirmed" && (
+                        <OperatorPaymentPanel
+                          reservationId={
+                            reservation.id
+                          }
+                        />
                       )}
                     </article>
                   );
