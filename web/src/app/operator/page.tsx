@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import OperatorDailyOperations from "@/components/operator/OperatorDailyOperations";
 import OperatorReservationQueue from "@/components/operator/OperatorReservationQueue";
@@ -34,10 +36,21 @@ export default function OperatorPage() {
               arrivals, departures and
               guest stays.
             </p>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="/operator/inquiries"
+                className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Open inquiry inbox
+              </Link>
+            </div>
           </header>
+
 
           <div className="space-y-10">
             <OperatorDailyOperations />
+
 
             <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
               <div className="mb-8">

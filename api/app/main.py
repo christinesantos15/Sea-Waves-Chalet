@@ -36,6 +36,10 @@ from app.routers.owner_users import (
     router as owner_users_router,
 )
 
+from app.routers.operator_inquiries import (
+    router as operator_inquiries_router,
+)
+
 app = FastAPI(
     title=settings.app_name,
     version="0.3.0",
@@ -56,9 +60,12 @@ app.add_middleware(
 app.include_router(inventory_router)
 app.include_router(availability_router)
 app.include_router(reservations_router)
+
 app.include_router(operator_reservations_router)
 app.include_router(operator_payments_router)
 app.include_router(operator_daily_operations_router)
+app.include_router(operator_inquiries_router)
+
 app.include_router(staff_operations_router)
 app.include_router(owner_dashboard_router)
 app.include_router(auth_router)
