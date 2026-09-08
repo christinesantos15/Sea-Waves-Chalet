@@ -26,12 +26,23 @@ from app.schemas.staff_operations import (
     MaintenanceIssueStatusUpdate,
 )
 
+from app.dependencies.auth import (
+    require_roles,
+)
 
 router = APIRouter(
     prefix="/staff",
     tags=["staff operations"],
+    dependencies=[
+        Depends(
+            require_roles(
+                "owner",
+                "operator",
+                "staff",
+            )
+        )
+    ],
 )
-
 
 HOUSEKEEPING_STATUSES = (
     "open",

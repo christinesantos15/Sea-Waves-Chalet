@@ -23,10 +23,21 @@ from app.schemas.reservation import (
     OperatorReservationResponse,
 )
 
+from app.dependencies.auth import (
+    require_roles,
+)
 
 router = APIRouter(
     prefix="/operator/daily-operations",
     tags=["operator daily operations"],
+    dependencies=[
+        Depends(
+            require_roles(
+                "owner",
+                "operator",
+            )
+        )
+    ],
 )
 
 

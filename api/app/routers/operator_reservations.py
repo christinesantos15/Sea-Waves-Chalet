@@ -23,10 +23,21 @@ from app.services.turnover import (
     create_checkout_turnover_task,
 )
 
+from app.dependencies.auth import (
+    require_roles,
+)
 
 router = APIRouter(
     prefix="/operator/reservations",
     tags=["operator reservations"],
+    dependencies=[
+        Depends(
+            require_roles(
+                "owner",
+                "operator",
+            )
+        )
+    ],
 )
 
 

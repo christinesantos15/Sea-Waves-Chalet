@@ -18,11 +18,22 @@ from app.schemas.payment import (
     OperatorPaymentSummaryResponse,
     OperatorReservationAmountUpdate,
 )
+from app.dependencies.auth import (
+    require_roles,
+)
 
 
 router = APIRouter(
     prefix="/operator/reservations",
     tags=["operator payments"],
+    dependencies=[
+        Depends(
+            require_roles(
+                "owner",
+                "operator",
+            )
+        )
+    ],
 )
 
 

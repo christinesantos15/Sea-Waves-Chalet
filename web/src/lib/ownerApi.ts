@@ -131,6 +131,7 @@ export async function getOwnerDashboard(
     }`,
     {
       method: "GET",
+      credentials: "include",
       cache: "no-store",
     },
   );

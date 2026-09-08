@@ -148,6 +148,7 @@ export async function getOperatorReservations(
     `${API_BASE_URL}/operator/reservations?${params.toString()}`,
     {
       method: "GET",
+      credentials: "include",
       cache: "no-store",
     },
   );
@@ -171,6 +172,7 @@ export async function decideReservation(
     `${API_BASE_URL}/operator/reservations/${reservationId}/decision`,
     {
       method: "PATCH",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -198,6 +200,7 @@ export async function checkInReservation(
     `${API_BASE_URL}/operator/reservations/${reservationId}/check-in`,
     {
       method: "PATCH",
+      credentials: "include",
     },
   );
 
@@ -219,6 +222,7 @@ export async function checkOutReservation(
     `${API_BASE_URL}/operator/reservations/${reservationId}/check-out`,
     {
       method: "PATCH",
+      credentials: "include",
     },
   );
 
@@ -240,6 +244,7 @@ export async function getReservationPayments(
     `${API_BASE_URL}/operator/reservations/${reservationId}/payments`,
     {
       method: "GET",
+      credentials: "include",
       cache: "no-store",
     },
   );
@@ -263,6 +268,7 @@ export async function updateReservationAmount(
     `${API_BASE_URL}/operator/reservations/${reservationId}/amount`,
     {
       method: "PATCH",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -291,6 +297,7 @@ export async function recordReservationPayment(
     `${API_BASE_URL}/operator/reservations/${reservationId}/payments`,
     {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
@@ -320,6 +327,7 @@ export async function getOperatorDailyOperations(
     `${API_BASE_URL}/operator/daily-operations?${params.toString()}`,
     {
       method: "GET",
+      credentials: "include",
       cache: "no-store",
     },
   );

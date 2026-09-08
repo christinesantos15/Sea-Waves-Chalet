@@ -34,10 +34,20 @@ from app.schemas.owner_dashboard import (
     OwnerTodayCounts,
 )
 
+from app.dependencies.auth import (
+    require_roles,
+)
 
 router = APIRouter(
     prefix="/owner",
     tags=["owner"],
+    dependencies=[
+        Depends(
+            require_roles(
+                "owner",
+            )
+        )
+    ],
 )
 
 
