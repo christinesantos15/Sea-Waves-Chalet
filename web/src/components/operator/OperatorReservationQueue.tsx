@@ -9,6 +9,8 @@ import {
 import OperatorPaymentPanel from "@/components/operator/OperatorPaymentPanel";
 
 import {
+  checkInReservation,
+  checkOutReservation,
   decideReservation,
   getOperatorReservations,
   type OperatorReservation,
@@ -18,6 +20,8 @@ import {
 type QueueStatus =
   | "pending"
   | "confirmed"
+  | "checked_in"
+  | "checked_out"
   | "declined";
 
 function formatDate(
@@ -40,8 +44,6 @@ function formatDate(
 function formatCreatedAt(
   value: string,
 ) {
-  const date = new Date(value);
-
   return new Intl.DateTimeFormat(
     "en-PH",
     {
@@ -50,7 +52,7 @@ function formatCreatedAt(
       hour: "numeric",
       minute: "2-digit",
     },
-  ).format(date);
+  ).format(new Date(value));
 }
 
 function statusClasses(
@@ -60,19 +62,40 @@ function statusClasses(
     case "confirmed":
       return "bg-emerald-100 text-emerald-800";
 
-    case "declined":
-    case "cancelled":
-      return "bg-red-100 text-red-700";
-
     case "checked_in":
       return "bg-sky-100 text-sky-800";
 
     case "checked_out":
-      return "bg-slate-100 text-slate-700";
+      return "bg-slate-200 text-slate-700";
+
+    case "declined":
+    case "cancelled":
+      return "bg-red-100 text-red-700";
 
     case "pending":
     default:
       return "bg-amber-100 text-amber-800";
+  }
+}
+
+function queueLabel(
+  status: QueueStatus,
+) {
+  switch (status) {
+    case "checked_in":
+      return "Checked in";
+
+    case "checked_out":
+      return "Checked out";
+
+    case "pending":
+      return "Pending";
+
+    case "confirmed":
+      return "Confirmed";
+
+    case "declined":
+      return "Declined";
   }
 }
 
@@ -93,6 +116,8 @@ export default function OperatorReservationQueue() {
     useState({
       pending: 0,
       confirmed: 0,
+      checked_in: 0,
+      checked_out: 0,
       declined: 0,
     });
 
@@ -120,6 +145,8 @@ export default function OperatorReservationQueue() {
         const [
           pending,
           confirmed,
+          checkedIn,
+          checkedOut,
           declined,
         ] = await Promise.all([
           getOperatorReservations(
@@ -129,6 +156,12 @@ export default function OperatorReservationQueue() {
             "confirmed",
           ),
           getOperatorReservations(
+            "checked_in",
+          ),
+          getOperatorReservations(
+            "checked_out",
+          ),
+          getOperatorReservations(
             "declined",
           ),
         ]);
@@ -136,37 +169,38 @@ export default function OperatorReservationQueue() {
         setCounts({
           pending:
             pending.length,
+
           confirmed:
             confirmed.length,
+
+          checked_in:
+            checkedIn.length,
+
+          checked_out:
+            checkedOut.length,
+
           declined:
             declined.length,
         });
 
-        if (
-          activeStatus === "pending"
-        ) {
-          setReservations(
-            pending,
-          );
-        }
+        const queueMap: Record<
+          QueueStatus,
+          OperatorReservation[]
+        > = {
+          pending,
+          confirmed,
+          checked_in:
+            checkedIn,
+          checked_out:
+            checkedOut,
+          declined,
+        };
 
-        if (
-          activeStatus ===
-          "confirmed"
-        ) {
-          setReservations(
-            confirmed,
-          );
-        }
-
-        if (
-          activeStatus ===
-          "declined"
-        ) {
-          setReservations(
-            declined,
-          );
-        }
+        setReservations(
+          queueMap[
+            activeStatus
+          ],
+        );
       } catch (error) {
         if (
           error instanceof Error
@@ -227,9 +261,79 @@ export default function OperatorReservationQueue() {
     }
   }
 
+  async function handleCheckIn(
+    reservation:
+      OperatorReservation,
+  ) {
+    try {
+      setActionReservationId(
+        reservation.id,
+      );
+
+      setError(null);
+
+      await checkInReservation(
+        reservation.id,
+      );
+
+      await loadDashboard();
+    } catch (error) {
+      if (
+        error instanceof Error
+      ) {
+        setError(
+          error.message,
+        );
+      } else {
+        setError(
+          "Could not check in reservation.",
+        );
+      }
+    } finally {
+      setActionReservationId(
+        null,
+      );
+    }
+  }
+
+  async function handleCheckOut(
+    reservation:
+      OperatorReservation,
+  ) {
+    try {
+      setActionReservationId(
+        reservation.id,
+      );
+
+      setError(null);
+
+      await checkOutReservation(
+        reservation.id,
+      );
+
+      await loadDashboard();
+    } catch (error) {
+      if (
+        error instanceof Error
+      ) {
+        setError(
+          error.message,
+        );
+      } else {
+        setError(
+          "Could not check out reservation.",
+        );
+      }
+    } finally {
+      setActionReservationId(
+        null,
+      );
+    }
+  }
+
   return (
     <div className="space-y-8">
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <button
           type="button"
           onClick={() =>
@@ -280,7 +384,63 @@ export default function OperatorReservationQueue() {
           </p>
 
           <p className="mt-1 text-xs text-slate-500">
-            Active bookings
+            Awaiting arrival
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            setActiveStatus(
+              "checked_in",
+            )
+          }
+          className={`rounded-2xl border p-5 text-left transition ${
+            activeStatus ===
+            "checked_in"
+              ? "border-sky-300 bg-sky-50"
+              : "border-slate-200 bg-white hover:border-slate-300"
+          }`}
+        >
+          <p className="text-sm font-medium text-slate-500">
+            Checked in
+          </p>
+
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {counts.checked_in}
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Current guests
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            setActiveStatus(
+              "checked_out",
+            )
+          }
+          className={`rounded-2xl border p-5 text-left transition ${
+            activeStatus ===
+            "checked_out"
+              ? "border-slate-400 bg-slate-100"
+              : "border-slate-200 bg-white hover:border-slate-300"
+          }`}
+        >
+          <p className="text-sm font-medium text-slate-500">
+            Checked out
+          </p>
+
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {
+              counts.checked_out
+            }
+          </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Completed stays
           </p>
         </button>
 
@@ -319,8 +479,10 @@ export default function OperatorReservationQueue() {
               Reservations
             </p>
 
-            <h2 className="mt-2 text-2xl font-semibold capitalize text-slate-950">
-              {activeStatus}{" "}
+            <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+              {queueLabel(
+                activeStatus,
+              )}{" "}
               reservations
             </h2>
           </div>
@@ -350,8 +512,7 @@ export default function OperatorReservationQueue() {
         {loading && (
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8 text-center">
             <p className="text-sm text-slate-500">
-              Loading
-              reservations...
+              Loading reservations...
             </p>
           </div>
         )}
@@ -361,7 +522,10 @@ export default function OperatorReservationQueue() {
             0 && (
             <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
               <p className="font-medium text-slate-800">
-                No {activeStatus}{" "}
+                No{" "}
+                {queueLabel(
+                  activeStatus,
+                ).toLowerCase()}{" "}
                 reservations
               </p>
 
@@ -407,9 +571,10 @@ export default function OperatorReservationQueue() {
                                 reservation.status,
                               )}`}
                             >
-                              {
-                                reservation.status
-                              }
+                              {reservation.status.replace(
+                                "_",
+                                " ",
+                              )}
                             </span>
                           </div>
 
@@ -581,11 +746,78 @@ export default function OperatorReservationQueue() {
 
                       {reservation.status ===
                         "confirmed" && (
-                        <OperatorPaymentPanel
-                          reservationId={
-                            reservation.id
-                          }
-                        />
+                        <>
+                          <div className="mt-6">
+                            <button
+                              type="button"
+                              disabled={
+                                actionPending
+                              }
+                              onClick={() =>
+                                void handleCheckIn(
+                                  reservation,
+                                )
+                              }
+                              className="w-full rounded-xl bg-sky-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {actionPending
+                                ? "Checking in..."
+                                : "Check in guest"}
+                            </button>
+                          </div>
+
+                          <OperatorPaymentPanel
+                            reservationId={
+                              reservation.id
+                            }
+                          />
+                        </>
+                      )}
+
+                      {reservation.status ===
+                        "checked_in" && (
+                        <>
+                          <div className="mt-6">
+                            <button
+                              type="button"
+                              disabled={
+                                actionPending
+                              }
+                              onClick={() =>
+                                void handleCheckOut(
+                                  reservation,
+                                )
+                              }
+                              className="w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {actionPending
+                                ? "Checking out..."
+                                : "Check out guest"}
+                            </button>
+                          </div>
+
+                          <OperatorPaymentPanel
+                            reservationId={
+                              reservation.id
+                            }
+                          />
+                        </>
+                      )}
+
+                      {reservation.status ===
+                        "checked_out" && (
+                        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-sm font-semibold text-slate-700">
+                            Stay completed
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-500">
+                            This guest has
+                            been checked out
+                            and the room has
+                            been released.
+                          </p>
+                        </div>
                       )}
                     </article>
                   );

@@ -175,6 +175,48 @@ export async function decideReservation(
   >;
 }
 
+export async function checkInReservation(
+  reservationId: number,
+): Promise<OperatorReservation> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/reservations/${reservationId}/check-in`,
+    {
+      method: "PATCH",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorReservation
+  >;
+}
+
+export async function checkOutReservation(
+  reservationId: number,
+): Promise<OperatorReservation> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/reservations/${reservationId}/check-out`,
+    {
+      method: "PATCH",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorReservation
+  >;
+}
+
 export async function getReservationPayments(
   reservationId: number,
 ): Promise<OperatorPaymentSummary> {

@@ -43,6 +43,13 @@ ALLOWED_PENDING_DECISIONS = (
 )
 
 
+BLOCKING_RESERVATION_STATUSES = (
+    "pending",
+    "confirmed",
+    "checked_in",
+)
+
+
 def build_operator_response(
     reservation: Reservation,
     guest: Guest,
@@ -72,6 +79,59 @@ def build_operator_response(
         ),
         notes=reservation.notes,
         created_at=reservation.created_at,
+    )
+
+
+def get_operator_reservation_response(
+    db: Session,
+    reservation_id: int,
+) -> OperatorReservationResponse:
+    statement = (
+        select(
+            Reservation,
+            Guest,
+            Cottage,
+            Room,
+        )
+        .join(
+            Guest,
+            Guest.id == Reservation.guest_id,
+        )
+        .join(
+            Cottage,
+            Cottage.id
+            == Reservation.cottage_id,
+        )
+        .outerjoin(
+            Room,
+            Room.id == Reservation.room_id,
+        )
+        .where(
+            Reservation.id
+            == reservation_id,
+        )
+    )
+
+    row = db.execute(statement).first()
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Reservation not found.",
+        )
+
+    (
+        reservation,
+        guest,
+        cottage,
+        room,
+    ) = row
+
+    return build_operator_response(
+        reservation,
+        guest,
+        cottage,
+        room,
     )
 
 
@@ -127,7 +187,9 @@ def get_operator_reservations(
         )
     )
 
-    rows = db.execute(statement).all()
+    rows = db.execute(
+        statement
+    ).all()
 
     return [
         build_operator_response(
@@ -153,47 +215,9 @@ def get_operator_reservation(
     reservation_id: int,
     db: Session = Depends(get_db),
 ) -> OperatorReservationResponse:
-    statement = (
-        select(
-            Reservation,
-            Guest,
-            Cottage,
-            Room,
-        )
-        .join(
-            Guest,
-            Guest.id == Reservation.guest_id,
-        )
-        .join(
-            Cottage,
-            Cottage.id
-            == Reservation.cottage_id,
-        )
-        .outerjoin(
-            Room,
-            Room.id == Reservation.room_id,
-        )
-        .where(
-            Reservation.id
-            == reservation_id,
-        )
-    )
-
-    row = db.execute(statement).first()
-
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Reservation not found.",
-        )
-
-    reservation, guest, cottage, room = row
-
-    return build_operator_response(
-        reservation,
-        guest,
-        cottage,
-        room,
+    return get_operator_reservation_response(
+        db,
+        reservation_id,
     )
 
 
@@ -255,11 +279,7 @@ def decide_pending_reservation(
                     Reservation.room_id
                     == reservation.room_id,
                     Reservation.status.in_(
-                        (
-                            "pending",
-                            "confirmed",
-                            "checked_in",
-                        )
+                        BLOCKING_RESERVATION_STATUSES
                     ),
                     Reservation.check_in
                     < reservation.check_out,
@@ -282,60 +302,113 @@ def decide_pending_reservation(
             decision.status
         )
 
-        db.flush()
         db.commit()
-        db.refresh(reservation)
 
-        statement = (
-            select(
-                Reservation,
-                Guest,
-                Cottage,
-                Room,
-            )
-            .join(
-                Guest,
-                Guest.id
-                == Reservation.guest_id,
-            )
-            .join(
-                Cottage,
-                Cottage.id
-                == Reservation.cottage_id,
-            )
-            .outerjoin(
-                Room,
-                Room.id
-                == Reservation.room_id,
-            )
-            .where(
-                Reservation.id
-                == reservation.id,
-            )
+        return get_operator_reservation_response(
+            db,
+            reservation.id,
         )
 
-        row = db.execute(
-            statement
-        ).first()
+    except HTTPException:
+        db.rollback()
+        raise
 
-        if row is None:
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.patch(
+    "/{reservation_id}/check-in",
+    response_model=OperatorReservationResponse,
+)
+def check_in_reservation(
+    reservation_id: int,
+    db: Session = Depends(get_db),
+) -> OperatorReservationResponse:
+    try:
+        reservation = db.scalar(
+            select(Reservation)
+            .where(
+                Reservation.id
+                == reservation_id,
+            )
+            .with_for_update()
+        )
+
+        if reservation is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Reservation not found.",
             )
 
-        (
-            reservation,
-            guest,
-            cottage,
-            room,
-        ) = row
+        if reservation.status != "confirmed":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Only confirmed reservations "
+                    "can be checked in."
+                ),
+            )
 
-        return build_operator_response(
-            reservation,
-            guest,
-            cottage,
-            room,
+        reservation.status = "checked_in"
+
+        db.commit()
+
+        return get_operator_reservation_response(
+            db,
+            reservation.id,
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.patch(
+    "/{reservation_id}/check-out",
+    response_model=OperatorReservationResponse,
+)
+def check_out_reservation(
+    reservation_id: int,
+    db: Session = Depends(get_db),
+) -> OperatorReservationResponse:
+    try:
+        reservation = db.scalar(
+            select(Reservation)
+            .where(
+                Reservation.id
+                == reservation_id,
+            )
+            .with_for_update()
+        )
+
+        if reservation is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Reservation not found.",
+            )
+
+        if reservation.status != "checked_in":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Only checked-in reservations "
+                    "can be checked out."
+                ),
+            )
+
+        reservation.status = "checked_out"
+
+        db.commit()
+
+        return get_operator_reservation_response(
+            db,
+            reservation.id,
         )
 
     except HTTPException:
