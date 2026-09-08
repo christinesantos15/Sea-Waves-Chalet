@@ -78,6 +78,13 @@ export default function CustomerPropertyMap({
                 {selected.name}
               </h3>
 
+              {selected.type === "cottage" &&
+                selected.status && (
+                    <span className="mt-3 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold capitalize text-emerald-800">
+                    {selected.status}
+                    </span>
+                )}
+
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 {selected.description}
               </p>

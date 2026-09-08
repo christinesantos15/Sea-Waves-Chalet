@@ -1,7 +1,10 @@
 import CustomerPropertyMap from "@/components/customer-map/CustomerPropertyMap";
-import { propertyMapLocations } from "@/data/propertyMap";
+import { getPropertyMapLocations } from "@/lib/resortApi";
 
-export default function Home() {
+export default async function Home() {
+  const locations =
+    await getPropertyMapLocations();
+
   return (
     <main className="min-h-screen bg-[#f7fbfc]">
       <header className="border-b border-white/70 bg-white/90 backdrop-blur">
@@ -17,15 +20,24 @@ export default function Home() {
           </div>
 
           <nav className="hidden items-center gap-8 text-sm font-medium text-slate-600 md:flex">
-            <a href="#explore" className="transition hover:text-slate-950">
+            <a
+              href="#explore"
+              className="transition hover:text-slate-950"
+            >
               Explore
             </a>
 
-            <a href="#stay" className="transition hover:text-slate-950">
+            <a
+              href="#stay"
+              className="transition hover:text-slate-950"
+            >
               Stay
             </a>
 
-            <a href="#contact" className="transition hover:text-slate-950">
+            <a
+              href="#contact"
+              className="transition hover:text-slate-950"
+            >
               Contact
             </a>
 
@@ -50,8 +62,8 @@ export default function Home() {
           </h1>
 
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            Discover the Sea Waves Chalet property through
-            an interactive resort map and find the spaces
+            Discover Sea Waves Chalet through an
+            interactive resort map and find the spaces
             that fit your stay.
           </p>
         </div>
@@ -62,7 +74,7 @@ export default function Home() {
         className="mx-auto max-w-7xl px-6 py-14 sm:py-20"
       >
         <CustomerPropertyMap
-          locations={propertyMapLocations}
+          locations={locations}
         />
       </section>
     </main>

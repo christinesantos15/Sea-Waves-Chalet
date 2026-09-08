@@ -8,9 +8,11 @@ export type MapLocationType =
 
 export type PropertyMapLocation = {
   id: string;
+  databaseId?: number;
   name: string;
   type: MapLocationType;
   description?: string;
+  status?: string;
   x: number;
   y: number;
   isDraft?: boolean;
