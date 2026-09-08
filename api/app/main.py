@@ -8,6 +8,10 @@ from app.routers.inventory import router as inventory_router
 from app.routers.availability import router as availability_router
 from app.routers.reservations import router as reservations_router
 
+from app.routers.operator_reservations import (
+    router as operator_reservations_router,
+)
+
 app = FastAPI(
     title=settings.app_name,
     version="0.3.0",
@@ -28,6 +32,7 @@ app.add_middleware(
 app.include_router(inventory_router)
 app.include_router(availability_router)
 app.include_router(reservations_router)
+app.include_router(operator_reservations_router)
 
 @app.get("/")
 def root():

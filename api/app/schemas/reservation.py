@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -59,3 +59,36 @@ class CustomerReservationResponse(BaseModel):
     guest_count: int
 
     message: str
+
+
+class OperatorReservationResponse(BaseModel):
+    id: int
+    reference: str
+
+    guest_id: int
+    guest_name: str
+    guest_phone: str | None
+    guest_email: str | None
+
+    cottage_id: int
+    cottage_code: str
+    cottage_name: str
+
+    room_id: int | None
+    room_code: str | None
+    room_name: str | None
+
+    source: str
+    status: str
+
+    check_in: date
+    check_out: date
+    guest_count: int
+
+    total_amount: str
+    notes: str | None
+    created_at: datetime
+
+
+class OperatorReservationDecision(BaseModel):
+    status: str
