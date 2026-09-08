@@ -7,7 +7,9 @@ import {
 
 import type { PropertyMapLocation } from "@/components/property-map/types";
 import {
+  getCottageAvailability,
   getCottageDetail,
+  type CottageAvailability,
   type CottageDetail,
 } from "@/lib/clientResortApi";
 
@@ -50,9 +52,34 @@ export default function CustomerPropertyMap({
   const [cottageError, setCottageError] =
     useState<string | null>(null);
 
+  const [checkIn, setCheckIn] =
+    useState("");
+
+  const [checkOut, setCheckOut] =
+    useState("");
+
+  const [availability, setAvailability] =
+    useState<CottageAvailability | null>(
+      null,
+    );
+
+  const [
+    loadingAvailability,
+    setLoadingAvailability,
+  ] = useState(false);
+
+  const [
+    availabilityError,
+    setAvailabilityError,
+  ] = useState<string | null>(null);
+
   useEffect(() => {
     setCottageDetail(null);
     setCottageError(null);
+    setAvailability(null);
+    setAvailabilityError(null);
+    setCheckIn("");
+    setCheckOut("");
 
     if (
       selected?.type !== "cottage" ||
@@ -62,16 +89,18 @@ export default function CustomerPropertyMap({
       return;
     }
 
-    const controller = new AbortController();
+    const controller =
+      new AbortController();
 
     async function loadCottage() {
       try {
         setLoadingCottage(true);
 
-        const detail = await getCottageDetail(
-          selected!.databaseId!,
-          controller.signal,
-        );
+        const detail =
+          await getCottageDetail(
+            selected!.databaseId!,
+            controller.signal,
+          );
 
         setCottageDetail(detail);
       } catch (error) {
@@ -99,6 +128,57 @@ export default function CustomerPropertyMap({
     };
   }, [selected]);
 
+  async function handleAvailabilityCheck() {
+    if (
+      selected?.type !== "cottage" ||
+      selected.databaseId === undefined
+    ) {
+      return;
+    }
+
+    setAvailability(null);
+    setAvailabilityError(null);
+
+    if (!checkIn || !checkOut) {
+      setAvailabilityError(
+        "Choose both a check-in and check-out date.",
+      );
+      return;
+    }
+
+    if (checkOut <= checkIn) {
+      setAvailabilityError(
+        "Check-out must be after check-in.",
+      );
+      return;
+    }
+
+    try {
+      setLoadingAvailability(true);
+
+      const result =
+        await getCottageAvailability(
+          selected.databaseId,
+          checkIn,
+          checkOut,
+        );
+
+      setAvailability(result);
+    } catch (error) {
+      if (error instanceof Error) {
+        setAvailabilityError(
+          error.message,
+        );
+      } else {
+        setAvailabilityError(
+          "We could not check availability.",
+        );
+      }
+    } finally {
+      setLoadingAvailability(false);
+    }
+  }
+
   return (
     <section>
       <div className="mb-8 max-w-2xl">
@@ -111,8 +191,8 @@ export default function CustomerPropertyMap({
         </h2>
 
         <p className="mt-3 text-base leading-7 text-slate-600">
-          Select a cottage or resort location directly
-          from the property map.
+          Select a cottage or resort location
+          directly from the property map.
         </p>
       </div>
 
@@ -175,14 +255,16 @@ export default function CustomerPropertyMap({
               </h3>
 
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                Select a cottage or resort amenity to
-                explore more information.
+                Select a cottage or resort
+                amenity to explore more
+                information.
               </p>
             </>
           )}
 
           {selected &&
-            selected.type !== "cottage" && (
+            selected.type !==
+              "cottage" && (
               <>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
                   Resort Location
@@ -198,7 +280,8 @@ export default function CustomerPropertyMap({
               </>
             )}
 
-          {selected?.type === "cottage" && (
+          {selected?.type ===
+            "cottage" && (
             <>
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -240,82 +323,206 @@ export default function CustomerPropertyMap({
 
               {cottageDetail &&
                 !loadingCottage && (
-                  <div className="mt-7 space-y-3">
-                    <div className="flex items-center justify-between">
+                  <>
+                    <div className="mt-7 rounded-2xl border border-sky-100 bg-sky-50/60 p-4">
                       <h4 className="font-semibold text-slate-950">
-                        Rooms
+                        Check availability
                       </h4>
 
-                      <span className="text-xs text-slate-500">
-                        {cottageDetail.rooms.length} available
-                        spaces
-                      </span>
+                      <div className="mt-4 grid grid-cols-2 gap-3">
+                        <label className="block">
+                          <span className="text-xs font-medium text-slate-600">
+                            Check-in
+                          </span>
+
+                          <input
+                            type="date"
+                            value={checkIn}
+                            onChange={(event) => {
+                              setCheckIn(
+                                event.target.value,
+                              );
+                              setAvailability(
+                                null,
+                              );
+                              setAvailabilityError(
+                                null,
+                              );
+                            }}
+                            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                          />
+                        </label>
+
+                        <label className="block">
+                          <span className="text-xs font-medium text-slate-600">
+                            Check-out
+                          </span>
+
+                          <input
+                            type="date"
+                            value={checkOut}
+                            min={
+                              checkIn ||
+                              undefined
+                            }
+                            onChange={(event) => {
+                              setCheckOut(
+                                event.target.value,
+                              );
+                              setAvailability(
+                                null,
+                              );
+                              setAvailabilityError(
+                                null,
+                              );
+                            }}
+                            className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                          />
+                        </label>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleAvailabilityCheck()
+                        }
+                        disabled={
+                          loadingAvailability
+                        }
+                        className="mt-4 w-full rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {loadingAvailability
+                          ? "Checking..."
+                          : "Check availability"}
+                      </button>
+
+                      {availabilityError && (
+                        <p className="mt-3 text-sm text-red-600">
+                          {
+                            availabilityError
+                          }
+                        </p>
+                      )}
                     </div>
 
-                    {cottageDetail.rooms.map(
-                      (room) => (
-                        <div
-                          key={room.id}
-                          className="rounded-2xl border border-slate-200 p-4 transition hover:border-sky-200 hover:bg-sky-50/40"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-slate-950">
-                                {room.name}
-                              </p>
+                    <div className="mt-7 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold text-slate-950">
+                          Rooms
+                        </h4>
 
-                              <p className="mt-1 text-xs capitalize text-slate-500">
-                                {room.status}
-                              </p>
+                        <span className="text-xs text-slate-500">
+                          {
+                            cottageDetail
+                              .rooms.length
+                          }{" "}
+                          rooms
+                        </span>
+                      </div>
+
+                      {cottageDetail.rooms.map(
+                        (room) => {
+                          const availabilityRoom =
+                            availability?.rooms.find(
+                              (
+                                candidate,
+                              ) =>
+                                candidate.id ===
+                                room.id,
+                            );
+
+                          return (
+                            <div
+                              key={room.id}
+                              className="rounded-2xl border border-slate-200 p-4 transition hover:border-sky-200 hover:bg-sky-50/40"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="font-semibold text-slate-950">
+                                    {
+                                      room.name
+                                    }
+                                  </p>
+
+                                  <p className="mt-1 text-xs capitalize text-slate-500">
+                                    {
+                                      room.status
+                                    }
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-col items-end gap-2">
+                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                    {
+                                      room.code
+                                    }
+                                  </span>
+
+                                  {availabilityRoom && (
+                                    <span
+                                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                        availabilityRoom.available
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : "bg-red-100 text-red-700"
+                                      }`}
+                                    >
+                                      {availabilityRoom.available
+                                        ? "Available"
+                                        : "Unavailable"}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-4 grid grid-cols-2 gap-3">
+                                <div>
+                                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                                    Capacity
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-medium text-slate-800">
+                                    {room.capacity ===
+                                    null
+                                      ? "To be confirmed"
+                                      : `${room.capacity} guests`}
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                                    Rate
+                                  </p>
+
+                                  <p className="mt-1 text-sm font-medium text-slate-800">
+                                    {formatRate(
+                                      room.base_rate,
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
                             </div>
+                          );
+                        },
+                      )}
 
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                              {room.code}
-                            </span>
-                          </div>
-
-                          <div className="mt-4 grid grid-cols-2 gap-3">
-                            <div>
-                              <p className="text-xs uppercase tracking-wide text-slate-400">
-                                Capacity
-                              </p>
-
-                              <p className="mt-1 text-sm font-medium text-slate-800">
-                                {room.capacity === null
-                                  ? "To be confirmed"
-                                  : `${room.capacity} guests`}
-                              </p>
-                            </div>
-
-                            <div>
-                              <p className="text-xs uppercase tracking-wide text-slate-400">
-                                Rate
-                              </p>
-
-                              <p className="mt-1 text-sm font-medium text-slate-800">
-                                {formatRate(
-                                  room.base_rate,
-                                )}
-                              </p>
-                            </div>
-                          </div>
+                      {availability && (
+                        <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                          Availability for{" "}
+                          <span className="font-medium text-slate-900">
+                            {
+                              availability.check_in
+                            }
+                          </span>{" "}
+                          to{" "}
+                          <span className="font-medium text-slate-900">
+                            {
+                              availability.check_out
+                            }
+                          </span>
                         </div>
-                      ),
-                    )}
-
-                    <button
-                      type="button"
-                      disabled
-                      className="mt-4 w-full cursor-not-allowed rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white opacity-60"
-                    >
-                      Check availability
-                    </button>
-
-                    <p className="text-center text-xs text-slate-400">
-                      Booking availability will be enabled
-                      in the next phase.
-                    </p>
-                  </div>
+                      )}
+                    </div>
+                  </>
                 )}
             </>
           )}
