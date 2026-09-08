@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.database import engine
 from app.routers.inventory import router as inventory_router
-
+from app.routers.availability import router as availability_router
 
 app = FastAPI(
     title=settings.app_name,
@@ -25,7 +25,7 @@ app.add_middleware(
 
 
 app.include_router(inventory_router)
-
+app.include_router(availability_router)
 
 @app.get("/")
 def root():
