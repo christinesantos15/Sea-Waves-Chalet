@@ -24,6 +24,10 @@ from app.routers.staff_operations import (
     router as staff_operations_router,
 )
 
+from app.routers.owner_dashboard import (
+    router as owner_dashboard_router,
+)
+
 app = FastAPI(
     title=settings.app_name,
     version="0.3.0",
@@ -48,6 +52,7 @@ app.include_router(operator_reservations_router)
 app.include_router(operator_payments_router)
 app.include_router(operator_daily_operations_router)
 app.include_router(staff_operations_router)
+app.include_router(owner_dashboard_router)
 
 @app.get("/")
 def root():
