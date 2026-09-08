@@ -1,6 +1,12 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -21,6 +27,12 @@ class HousekeepingTask(Base):
     cottage_id: Mapped[int | None] = mapped_column(
         ForeignKey("cottages.id"),
         nullable=True,
+    )
+
+    room_id: Mapped[int | None] = mapped_column(
+        ForeignKey("rooms.id"),
+        nullable=True,
+        index=True,
     )
 
     title: Mapped[str] = mapped_column(

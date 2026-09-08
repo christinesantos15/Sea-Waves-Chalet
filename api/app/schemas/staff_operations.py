@@ -26,6 +26,7 @@ TaskPriority = Literal[
 
 class HousekeepingTaskCreate(BaseModel):
     cottage_id: int | None = None
+    room_id: int | None = None
 
     title: str = Field(
         min_length=1,
@@ -54,6 +55,10 @@ class HousekeepingTaskResponse(BaseModel):
     cottage_id: int | None
     cottage_code: str | None
     cottage_name: str | None
+
+    room_id: int | None
+    room_code: str | None
+    room_name: str | None
 
     title: str
     description: str | None

@@ -15,6 +15,7 @@ from app.models import (
     Cottage,
     HousekeepingTask,
     MaintenanceIssue,
+    Room,
 )
 from app.schemas.staff_operations import (
     HousekeepingTaskCreate,
@@ -44,6 +45,12 @@ MAINTENANCE_STATUSES = (
     "resolved",
 )
 
+ROOM_HOUSEKEEPING_STATUSES = (
+    "available",
+    "needs_cleaning",
+    "cleaning",
+)
+
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -67,9 +74,83 @@ def get_cottage_or_404(
     return cottage
 
 
+def get_room_or_404(
+    db: Session,
+    room_id: int,
+) -> Room:
+    room = db.get(
+        Room,
+        room_id,
+    )
+
+    if room is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Room not found.",
+        )
+
+    return room
+
+
+def resolve_housekeeping_location(
+    db: Session,
+    cottage_id: int | None,
+    room_id: int | None,
+) -> tuple[
+    Cottage | None,
+    Room | None,
+    int | None,
+]:
+    cottage = None
+    room = None
+    resolved_cottage_id = cottage_id
+
+    if cottage_id is not None:
+        cottage = get_cottage_or_404(
+            db,
+            cottage_id,
+        )
+
+    if room_id is not None:
+        room = get_room_or_404(
+            db,
+            room_id,
+        )
+
+        if (
+            cottage_id is not None
+            and room.cottage_id
+            != cottage_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Room does not belong "
+                    "to the selected cottage."
+                ),
+            )
+
+        resolved_cottage_id = (
+            room.cottage_id
+        )
+
+        if cottage is None:
+            cottage = get_cottage_or_404(
+                db,
+                room.cottage_id,
+            )
+
+    return (
+        cottage,
+        room,
+        resolved_cottage_id,
+    )
+
+
 def build_housekeeping_response(
     task: HousekeepingTask,
     cottage: Cottage | None,
+    room: Room | None,
 ) -> HousekeepingTaskResponse:
     return HousekeepingTaskResponse(
         id=task.id,
@@ -82,6 +163,17 @@ def build_housekeeping_response(
         cottage_name=(
             cottage.name
             if cottage is not None
+            else None
+        ),
+        room_id=task.room_id,
+        room_code=(
+            room.code
+            if room is not None
+            else None
+        ),
+        room_name=(
+            room.name
+            if room is not None
             else None
         ),
         title=task.title,
@@ -123,6 +215,44 @@ def build_maintenance_response(
     )
 
 
+def sync_room_readiness(
+    db: Session,
+    room: Room,
+) -> None:
+    if (
+        room.status
+        not in ROOM_HOUSEKEEPING_STATUSES
+    ):
+        return
+
+    active_statuses = set(
+        db.scalars(
+            select(
+                HousekeepingTask.status
+            ).where(
+                HousekeepingTask.room_id
+                == room.id,
+                HousekeepingTask.status.in_(
+                    (
+                        "open",
+                        "in_progress",
+                    )
+                ),
+            )
+        ).all()
+    )
+
+    if "in_progress" in active_statuses:
+        room.status = "cleaning"
+        return
+
+    if "open" in active_statuses:
+        room.status = "needs_cleaning"
+        return
+
+    room.status = "available"
+
+
 @router.get(
     "/housekeeping",
     response_model=list[
@@ -152,11 +282,17 @@ def get_housekeeping_tasks(
         select(
             HousekeepingTask,
             Cottage,
+            Room,
         )
         .outerjoin(
             Cottage,
             Cottage.id
             == HousekeepingTask.cottage_id,
+        )
+        .outerjoin(
+            Room,
+            Room.id
+            == HousekeepingTask.room_id,
         )
     )
 
@@ -179,8 +315,13 @@ def get_housekeeping_tasks(
         build_housekeeping_response(
             task,
             cottage,
+            room,
         )
-        for task, cottage in rows
+        for (
+            task,
+            cottage,
+            room,
+        ) in rows
     ]
 
 
@@ -194,16 +335,19 @@ def create_housekeeping_task(
     db: Session = Depends(get_db),
 ) -> HousekeepingTaskResponse:
     try:
-        cottage = None
-
-        if data.cottage_id is not None:
-            cottage = get_cottage_or_404(
-                db,
-                data.cottage_id,
-            )
+        (
+            cottage,
+            room,
+            resolved_cottage_id,
+        ) = resolve_housekeeping_location(
+            db,
+            data.cottage_id,
+            data.room_id,
+        )
 
         task = HousekeepingTask(
-            cottage_id=data.cottage_id,
+            cottage_id=resolved_cottage_id,
+            room_id=data.room_id,
             title=data.title.strip(),
             description=data.description,
             status="open",
@@ -215,12 +359,22 @@ def create_housekeeping_task(
         )
 
         db.add(task)
+
+        db.flush()
+
+        if room is not None:
+            sync_room_readiness(
+                db,
+                room,
+            )
+
         db.commit()
         db.refresh(task)
 
         return build_housekeeping_response(
             task,
             cottage,
+            room,
         )
 
     except HTTPException:
@@ -267,11 +421,30 @@ def update_housekeeping_status(
             task.completed_at = None
 
         cottage = None
+        room = None
 
         if task.cottage_id is not None:
             cottage = db.get(
                 Cottage,
                 task.cottage_id,
+            )
+
+        if task.room_id is not None:
+            room = db.scalar(
+                select(Room)
+                .where(
+                    Room.id
+                    == task.room_id,
+                )
+                .with_for_update()
+            )
+
+        db.flush()
+
+        if room is not None:
+            sync_room_readiness(
+                db,
+                room,
             )
 
         db.commit()
@@ -280,6 +453,7 @@ def update_housekeeping_status(
         return build_housekeeping_response(
             task,
             cottage,
+            room,
         )
 
     except HTTPException:
