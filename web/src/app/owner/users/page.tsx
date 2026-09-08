@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import OwnerDashboard from "@/components/owner/OwnerDashboard";
+import OwnerUserManagement from "@/components/owner/OwnerUserManagement";
 
 
-export default function OwnerPage() {
+export default function OwnerUsersPage() {
   return (
     <ProtectedRoute
       allowedRoles={[
@@ -14,7 +14,14 @@ export default function OwnerPage() {
       <main className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <header className="mb-8">
-            <div className="flex flex-wrap items-center gap-3">
+            <Link
+              href="/owner"
+              className="text-sm font-semibold text-sky-700 hover:text-sky-800"
+            >
+              ← Owner Overview
+            </Link>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
                 Sea Waves Chalet
               </p>
@@ -25,29 +32,17 @@ export default function OwnerPage() {
             </div>
 
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Owner Overview
+              User Management
             </h1>
 
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-              A simple view of
-              today&apos;s resort
-              activity, bookings,
-              payments, room readiness
-              and issues needing
-              attention.
+              Create and manage
+              Operator and Staff access
+              for Sea Waves Chalet.
             </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Link
-                href="/owner/users"
-                className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-              >
-                Manage users
-              </Link>
-            </div>
           </header>
 
-          <OwnerDashboard />
+          <OwnerUserManagement />
         </div>
       </main>
     </ProtectedRoute>
