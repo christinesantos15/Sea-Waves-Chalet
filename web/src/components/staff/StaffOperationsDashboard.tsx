@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 
@@ -12,6 +13,7 @@ import {
   getCottageOptions,
   getHousekeepingTasks,
   getMaintenanceIssues,
+  getRoomOptions,
   updateHousekeepingStatus,
   updateMaintenanceStatus,
   type CottageOption,
@@ -19,12 +21,15 @@ import {
   type HousekeepingTask,
   type MaintenanceIssue,
   type MaintenanceStatus,
+  type RoomOption,
   type TaskPriority,
 } from "@/lib/staffApi";
+
 
 type ViewMode =
   | "housekeeping"
   | "maintenance";
+
 
 function formatDateTime(
   value: string | null,
@@ -47,6 +52,7 @@ function formatDateTime(
   );
 }
 
+
 function priorityClasses(
   priority: TaskPriority,
 ) {
@@ -66,6 +72,7 @@ function priorityClasses(
   }
 }
 
+
 function housekeepingStatusClasses(
   status: HousekeepingStatus,
 ) {
@@ -82,6 +89,7 @@ function housekeepingStatusClasses(
   }
 }
 
+
 function maintenanceStatusClasses(
   status: MaintenanceStatus,
 ) {
@@ -97,6 +105,92 @@ function maintenanceStatusClasses(
       return "bg-red-100 text-red-700";
   }
 }
+
+
+function roomStatusLabel(
+  status: string,
+) {
+  switch (status) {
+    case "available":
+      return "Ready";
+
+    case "needs_cleaning":
+      return "Needs cleaning";
+
+    case "cleaning":
+      return "Cleaning";
+
+    default:
+      return status
+        .replaceAll("_", " ")
+        .replace(
+          /\b\w/g,
+          (character) =>
+            character.toUpperCase(),
+        );
+  }
+}
+
+
+function roomStatusClasses(
+  status: string,
+) {
+  switch (status) {
+    case "available":
+      return (
+        "border-emerald-200 " +
+        "bg-emerald-50 " +
+        "text-emerald-700"
+      );
+
+    case "needs_cleaning":
+      return (
+        "border-amber-200 " +
+        "bg-amber-50 " +
+        "text-amber-800"
+      );
+
+    case "cleaning":
+      return (
+        "border-sky-200 " +
+        "bg-sky-50 " +
+        "text-sky-700"
+      );
+
+    default:
+      return (
+        "border-slate-200 " +
+        "bg-slate-100 " +
+        "text-slate-700"
+      );
+  }
+}
+
+
+function housekeepingLocation(
+  task: HousekeepingTask,
+) {
+  if (
+    task.cottage_name &&
+    task.room_name
+  ) {
+    return (
+      `${task.cottage_name} · ` +
+      task.room_name
+    );
+  }
+
+  if (task.cottage_name) {
+    return task.cottage_name;
+  }
+
+  if (task.room_name) {
+    return task.room_name;
+  }
+
+  return "General resort";
+}
+
 
 export default function StaffOperationsDashboard() {
   const [
@@ -127,20 +221,31 @@ export default function StaffOperationsDashboard() {
     CottageOption[]
   >([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    rooms,
+    setRooms,
+  ] = useState<
+    RoomOption[]
+  >([]);
 
-  const [error, setError] =
-    useState<string | null>(
-      null,
-    );
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    error,
+    setError,
+  ] = useState<string | null>(
+    null,
+  );
 
   const [
     actionId,
     setActionId,
-  ] = useState<
-    number | null
-  >(null);
+  ] = useState<number | null>(
+    null,
+  );
 
   const [
     showHousekeepingForm,
@@ -155,6 +260,11 @@ export default function StaffOperationsDashboard() {
   const [
     housekeepingCottage,
     setHousekeepingCottage,
+  ] = useState("");
+
+  const [
+    housekeepingRoom,
+    setHousekeepingRoom,
   ] = useState("");
 
   const [
@@ -226,6 +336,7 @@ export default function StaffOperationsDashboard() {
     setSavingMaintenance,
   ] = useState(false);
 
+
   const loadDashboard =
     useCallback(async () => {
       try {
@@ -242,6 +353,11 @@ export default function StaffOperationsDashboard() {
           getCottageOptions(),
         ]);
 
+        const roomOptions =
+          await getRoomOptions(
+            cottageOptions,
+          );
+
         setHousekeepingTasks(
           housekeeping,
         );
@@ -252,6 +368,10 @@ export default function StaffOperationsDashboard() {
 
         setCottages(
           cottageOptions,
+        );
+
+        setRooms(
+          roomOptions,
         );
       } catch (error) {
         if (
@@ -270,9 +390,147 @@ export default function StaffOperationsDashboard() {
       }
     }, []);
 
+
   useEffect(() => {
     void loadDashboard();
   }, [loadDashboard]);
+
+
+  const activeRooms =
+    useMemo(
+      () =>
+        rooms.filter(
+          (room) =>
+            room.is_active,
+        ),
+      [rooms],
+    );
+
+
+  const readyRooms =
+    useMemo(
+      () =>
+        activeRooms.filter(
+          (room) =>
+            room.status ===
+            "available",
+        ),
+      [activeRooms],
+    );
+
+
+  const needsCleaningRooms =
+    useMemo(
+      () =>
+        activeRooms.filter(
+          (room) =>
+            room.status ===
+            "needs_cleaning",
+        ),
+      [activeRooms],
+    );
+
+
+  const cleaningRooms =
+    useMemo(
+      () =>
+        activeRooms.filter(
+          (room) =>
+            room.status ===
+            "cleaning",
+        ),
+      [activeRooms],
+    );
+
+
+  const otherRooms =
+    useMemo(
+      () =>
+        activeRooms.filter(
+          (room) =>
+            ![
+              "available",
+              "needs_cleaning",
+              "cleaning",
+            ].includes(
+              room.status,
+            ),
+        ),
+      [activeRooms],
+    );
+
+
+  const openHousekeepingCount =
+    housekeepingTasks.filter(
+      (task) =>
+        task.status === "open",
+    ).length;
+
+
+  const cleaningTaskCount =
+    housekeepingTasks.filter(
+      (task) =>
+        task.status ===
+        "in_progress",
+    ).length;
+
+
+  const openMaintenanceCount =
+    maintenanceIssues.filter(
+      (issue) =>
+        issue.status !==
+        "resolved",
+    ).length;
+
+
+  const filteredHousekeepingRooms =
+    useMemo(() => {
+      if (!housekeepingCottage) {
+        return [];
+      }
+
+      const cottageId =
+        Number(
+          housekeepingCottage,
+        );
+
+      return activeRooms.filter(
+        (room) =>
+          room.cottage_id ===
+          cottageId,
+      );
+    }, [
+      activeRooms,
+      housekeepingCottage,
+    ]);
+
+
+  function getActiveTaskForRoom(
+    roomId: number,
+  ) {
+    const roomTasks =
+      housekeepingTasks.filter(
+        (task) =>
+          task.room_id === roomId &&
+          task.status !==
+            "completed",
+      );
+
+    return (
+      roomTasks.find(
+        (task) =>
+          task.status ===
+          "in_progress",
+      ) ??
+      roomTasks.find(
+        (task) =>
+          task.status ===
+          "open",
+      ) ??
+      null
+    );
+  }
+
 
   async function handleHousekeepingStatus(
     taskId: number,
@@ -310,6 +568,7 @@ export default function StaffOperationsDashboard() {
     }
   }
 
+
   async function handleMaintenanceStatus(
     issueId: number,
     status: MaintenanceStatus,
@@ -346,6 +605,7 @@ export default function StaffOperationsDashboard() {
     }
   }
 
+
   async function handleCreateHousekeeping() {
     if (
       !housekeepingTitle.trim()
@@ -373,6 +633,13 @@ export default function StaffOperationsDashboard() {
                 )
               : null,
 
+          room_id:
+            housekeepingRoom
+              ? Number(
+                  housekeepingRoom,
+                )
+              : null,
+
           title:
             housekeepingTitle.trim(),
 
@@ -397,11 +664,14 @@ export default function StaffOperationsDashboard() {
       );
 
       setHousekeepingCottage("");
+      setHousekeepingRoom("");
       setHousekeepingTitle("");
       setHousekeepingDescription("");
+
       setHousekeepingPriority(
         "normal",
       );
+
       setHousekeepingAssignedTo("");
       setHousekeepingDueAt("");
 
@@ -428,6 +698,7 @@ export default function StaffOperationsDashboard() {
       );
     }
   }
+
 
   async function handleCreateMaintenance() {
     if (
@@ -480,9 +751,11 @@ export default function StaffOperationsDashboard() {
       setMaintenanceLocation("");
       setMaintenanceTitle("");
       setMaintenanceDescription("");
+
       setMaintenancePriority(
         "normal",
       );
+
       setMaintenanceReportedBy("");
 
       setShowMaintenanceForm(
@@ -509,915 +782,1371 @@ export default function StaffOperationsDashboard() {
     }
   }
 
-  const housekeepingCounts = {
-    open:
-      housekeepingTasks.filter(
-        (task) =>
-          task.status === "open",
-      ).length,
 
-    inProgress:
-      housekeepingTasks.filter(
-        (task) =>
-          task.status ===
-          "in_progress",
-      ).length,
+  if (loading) {
+    return (
+      <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <p className="text-sm text-slate-600">
+          Loading staff operations...
+        </p>
+      </section>
+    );
+  }
 
-    completed:
-      housekeepingTasks.filter(
-        (task) =>
-          task.status ===
-          "completed",
-      ).length,
-  };
-
-  const maintenanceCounts = {
-    open:
-      maintenanceIssues.filter(
-        (issue) =>
-          issue.status === "open",
-      ).length,
-
-    inProgress:
-      maintenanceIssues.filter(
-        (issue) =>
-          issue.status ===
-          "in_progress",
-      ).length,
-
-    resolved:
-      maintenanceIssues.filter(
-        (issue) =>
-          issue.status ===
-          "resolved",
-      ).length,
-  };
 
   return (
-    <div className="space-y-8">
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-          <p className="text-sm font-medium text-amber-800">
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
             Open housekeeping
           </p>
 
-          <p className="mt-2 text-3xl font-semibold text-slate-950">
-            {
-              housekeepingCounts.open
-            }
+          <p className="mt-2 text-3xl font-bold text-slate-950">
+            {openHousekeepingCount}
+          </p>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Waiting to be started
           </p>
         </div>
 
-        <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
-          <p className="text-sm font-medium text-sky-800">
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
             Cleaning in progress
           </p>
 
-          <p className="mt-2 text-3xl font-semibold text-slate-950">
-            {
-              housekeepingCounts.inProgress
-            }
+          <p className="mt-2 text-3xl font-bold text-slate-950">
+            {cleaningTaskCount}
+          </p>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Active housekeeping work
           </p>
         </div>
 
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-          <p className="text-sm font-medium text-red-800">
-            Open maintenance
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-medium text-slate-500">
+            Maintenance attention
           </p>
 
-          <p className="mt-2 text-3xl font-semibold text-slate-950">
-            {
-              maintenanceCounts.open
-            }
+          <p className="mt-2 text-3xl font-bold text-slate-950">
+            {openMaintenanceCount}
+          </p>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Open or in progress
           </p>
         </div>
       </section>
 
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-700">
-            {error}
-          </p>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setViewMode(
+                  "housekeeping",
+                )
+              }
+              className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                viewMode ===
+                "housekeeping"
+                  ? "bg-slate-950 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Housekeeping
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setViewMode(
+                  "maintenance",
+                )
+              }
+              className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                viewMode ===
+                "maintenance"
+                  ? "bg-slate-950 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              Maintenance
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              void loadDashboard()
+            }
+            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Refresh
+          </button>
         </div>
-      )}
+      </section>
 
-      <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
-          onClick={() =>
-            setViewMode(
-              "housekeeping",
-            )
-          }
-          className={`rounded-xl px-5 py-3 text-sm font-semibold transition ${
-            viewMode ===
-            "housekeeping"
-              ? "bg-slate-950 text-white"
-              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          Housekeeping
-        </button>
-
-        <button
-          type="button"
-          onClick={() =>
-            setViewMode(
-              "maintenance",
-            )
-          }
-          className={`rounded-xl px-5 py-3 text-sm font-semibold transition ${
-            viewMode ===
-            "maintenance"
-              ? "bg-slate-950 text-white"
-              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-          }`}
-        >
-          Maintenance
-        </button>
-
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() =>
-            void loadDashboard()
-          }
-          className="ml-auto rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
-        >
-          {loading
-            ? "Refreshing..."
-            : "Refresh"}
-        </button>
-      </div>
 
       {viewMode ===
         "housekeeping" && (
-        <section>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-                Housekeeping
-              </p>
+        <>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-sky-700">
+                  Room turnover
+                </p>
 
-              <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-                Cleaning tasks
-              </h2>
+                <h2 className="mt-2 text-2xl font-bold text-slate-950">
+                  Room readiness
+                </h2>
+
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  See which rooms are
+                  ready for guests, need
+                  cleaning, or are
+                  currently being cleaned.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setShowHousekeepingForm(
+                    !showHousekeepingForm,
+                  )
+                }
+                className="rounded-2xl bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-800"
+              >
+                {showHousekeepingForm
+                  ? "Close"
+                  : "New housekeeping task"}
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                setShowHousekeepingForm(
-                  (value) =>
-                    !value,
-                )
-              }
-              className="rounded-xl bg-sky-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800"
-            >
-              New housekeeping task
-            </button>
-          </div>
 
-          {showHousekeepingForm && (
-            <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/50 p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label>
-                  <span className="text-sm font-medium text-slate-700">
-                    Cottage
-                  </span>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-sm font-semibold text-emerald-700">
+                  Ready
+                </p>
 
-                  <select
-                    value={
-                      housekeepingCottage
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setHousekeepingCottage(
-                        event.target
-                          .value,
-                      )
-                    }
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                  >
-                    <option value="">
-                      General resort task
-                    </option>
-
-                    {cottages.map(
-                      (cottage) => (
-                        <option
-                          key={
-                            cottage.id
-                          }
-                          value={
-                            cottage.id
-                          }
-                        >
-                          {
-                            cottage.code
-                          }{" "}
-                          —{" "}
-                          {
-                            cottage.name
-                          }
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </label>
-
-                <label>
-                  <span className="text-sm font-medium text-slate-700">
-                    Priority
-                  </span>
-
-                  <select
-                    value={
-                      housekeepingPriority
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setHousekeepingPriority(
-                        event.target
-                          .value as TaskPriority,
-                      )
-                    }
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                  >
-                    <option value="low">
-                      Low
-                    </option>
-                    <option value="normal">
-                      Normal
-                    </option>
-                    <option value="high">
-                      High
-                    </option>
-                    <option value="urgent">
-                      Urgent
-                    </option>
-                  </select>
-                </label>
+                <p className="mt-2 text-3xl font-bold text-emerald-950">
+                  {readyRooms.length}
+                </p>
               </div>
 
-              <label className="mt-4 block">
-                <span className="text-sm font-medium text-slate-700">
-                  Task
-                </span>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-700">
+                  Needs cleaning
+                </p>
 
-                <input
-                  type="text"
-                  value={
-                    housekeepingTitle
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setHousekeepingTitle(
-                      event.target
-                        .value,
-                    )
-                  }
-                  placeholder="Clean cottage after checkout"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-sm font-medium text-slate-700">
-                  Description
-                </span>
-
-                <textarea
-                  rows={3}
-                  value={
-                    housekeepingDescription
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setHousekeepingDescription(
-                      event.target
-                        .value,
-                    )
-                  }
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                />
-              </label>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <label>
-                  <span className="text-sm font-medium text-slate-700">
-                    Assigned to
-                  </span>
-
-                  <input
-                    type="text"
-                    value={
-                      housekeepingAssignedTo
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setHousekeepingAssignedTo(
-                        event.target
-                          .value,
-                      )
-                    }
-                    placeholder="Staff name"
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                  />
-                </label>
-
-                <label>
-                  <span className="text-sm font-medium text-slate-700">
-                    Due
-                  </span>
-
-                  <input
-                    type="datetime-local"
-                    value={
-                      housekeepingDueAt
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setHousekeepingDueAt(
-                        event.target
-                          .value,
-                      )
-                    }
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                  />
-                </label>
+                <p className="mt-2 text-3xl font-bold text-amber-950">
+                  {needsCleaningRooms.length}
+                </p>
               </div>
 
-              <div className="mt-5 flex gap-3">
-                <button
-                  type="button"
-                  disabled={
-                    savingHousekeeping
-                  }
-                  onClick={() =>
-                    void handleCreateHousekeeping()
-                  }
-                  className="rounded-xl bg-sky-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  {savingHousekeeping
-                    ? "Saving..."
-                    : "Create task"}
-                </button>
+              <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <p className="text-sm font-semibold text-sky-700">
+                  Cleaning
+                </p>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowHousekeepingForm(
-                      false,
-                    )
-                  }
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
-                >
-                  Cancel
-                </button>
+                <p className="mt-2 text-3xl font-bold text-sky-950">
+                  {cleaningRooms.length}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-600">
+                  Other status
+                </p>
+
+                <p className="mt-2 text-3xl font-bold text-slate-950">
+                  {otherRooms.length}
+                </p>
               </div>
             </div>
-          )}
 
-          <div className="mt-6 grid gap-4 xl:grid-cols-2">
-            {housekeepingTasks.map(
-              (task) => (
-                <article
-                  key={task.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-400">
-                        HOUSEKEEPING #
-                        {task.id}
-                      </p>
 
-                      <h3 className="mt-2 text-lg font-semibold text-slate-950">
-                        {task.title}
-                      </h3>
+            {showHousekeepingForm && (
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <h3 className="font-semibold text-slate-950">
+                  Create housekeeping task
+                </h3>
 
-                      <p className="mt-1 text-sm text-slate-500">
-                        {task.cottage_name ??
-                          "General resort"}
-                      </p>
-                    </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Cottage
+                    </span>
 
-                    <div className="flex flex-wrap gap-2">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${priorityClasses(
-                          task.priority,
-                        )}`}
-                      >
-                        {
-                          task.priority
-                        }
-                      </span>
-
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${housekeepingStatusClasses(
-                          task.status,
-                        )}`}
-                      >
-                        {task.status.replace(
-                          "_",
-                          " ",
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  {task.description && (
-                    <p className="mt-4 text-sm leading-6 text-slate-600">
-                      {
-                        task.description
+                    <select
+                      value={
+                        housekeepingCottage
                       }
-                    </p>
-                  )}
+                      onChange={(
+                        event,
+                      ) => {
+                        setHousekeepingCottage(
+                          event.target.value,
+                        );
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">
-                        Assigned
-                      </p>
+                        setHousekeepingRoom(
+                          "",
+                        );
+                      }}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-sky-500"
+                    >
+                      <option value="">
+                        General resort
+                      </option>
 
-                      <p className="mt-1 text-sm text-slate-700">
-                        {task.assigned_to ??
-                          "Unassigned"}
-                      </p>
-                    </div>
+                      {cottages.map(
+                        (cottage) => (
+                          <option
+                            key={
+                              cottage.id
+                            }
+                            value={
+                              cottage.id
+                            }
+                          >
+                            {
+                              cottage.name
+                            }{" "}
+                            (
+                            {
+                              cottage.code
+                            }
+                            )
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
 
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">
-                        Due
-                      </p>
 
-                      <p className="mt-1 text-sm text-slate-700">
-                        {formatDateTime(
-                          task.due_at,
-                        )}
-                      </p>
-                    </div>
-                  </div>
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Room
+                    </span>
 
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {task.status !==
-                      "open" && (
-                      <button
-                        type="button"
-                        disabled={
-                          actionId ===
-                          task.id
-                        }
-                        onClick={() =>
-                          void handleHousekeepingStatus(
-                            task.id,
-                            "open",
-                          )
-                        }
-                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
-                      >
-                        Reopen
-                      </button>
-                    )}
+                    <select
+                      value={
+                        housekeepingRoom
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setHousekeepingRoom(
+                          event.target.value,
+                        )
+                      }
+                      disabled={
+                        !housekeepingCottage
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none disabled:bg-slate-100 disabled:text-slate-400 focus:border-sky-500"
+                    >
+                      <option value="">
+                        {housekeepingCottage
+                          ? "Whole cottage / no specific room"
+                          : "Select a cottage first"}
+                      </option>
 
-                    {task.status !==
-                      "in_progress" && (
-                      <button
-                        type="button"
-                        disabled={
-                          actionId ===
-                          task.id
-                        }
-                        onClick={() =>
-                          void handleHousekeepingStatus(
-                            task.id,
-                            "in_progress",
-                          )
-                        }
-                        className="rounded-xl bg-sky-100 px-4 py-2 text-sm font-semibold text-sky-700"
-                      >
-                        Start cleaning
-                      </button>
-                    )}
+                      {filteredHousekeepingRooms.map(
+                        (room) => (
+                          <option
+                            key={
+                              room.id
+                            }
+                            value={
+                              room.id
+                            }
+                          >
+                            {
+                              room.name
+                            }{" "}
+                            (
+                            {
+                              room.code
+                            }
+                            ) —{" "}
+                            {
+                              roomStatusLabel(
+                                room.status,
+                              )
+                            }
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
 
-                    {task.status !==
-                      "completed" && (
-                      <button
-                        type="button"
-                        disabled={
-                          actionId ===
-                          task.id
-                        }
-                        onClick={() =>
-                          void handleHousekeepingStatus(
-                            task.id,
-                            "completed",
-                          )
-                        }
-                        className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
-                      >
-                        Mark completed
-                      </button>
-                    )}
-                  </div>
-                </article>
-              ),
+
+                  <label className="space-y-1.5 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">
+                      Task title
+                    </span>
+
+                    <input
+                      value={
+                        housekeepingTitle
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setHousekeepingTitle(
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Example: Replace bed linen"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-sky-500"
+                    />
+                  </label>
+
+
+                  <label className="space-y-1.5 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">
+                      Description
+                    </span>
+
+                    <textarea
+                      value={
+                        housekeepingDescription
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setHousekeepingDescription(
+                          event.target.value,
+                        )
+                      }
+                      rows={3}
+                      placeholder="Optional details for staff"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-sky-500"
+                    />
+                  </label>
+
+
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Priority
+                    </span>
+
+                    <select
+                      value={
+                        housekeepingPriority
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setHousekeepingPriority(
+                          event.target
+                            .value as TaskPriority,
+                        )
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-sky-500"
+                    >
+                      <option value="low">
+                        Low
+                      </option>
+
+                      <option value="normal">
+                        Normal
+                      </option>
+
+                      <option value="high">
+                        High
+                      </option>
+
+                      <option value="urgent">
+                        Urgent
+                      </option>
+                    </select>
+                  </label>
+
+
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Assigned to
+                    </span>
+
+                    <input
+                      value={
+                        housekeepingAssignedTo
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setHousekeepingAssignedTo(
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Optional staff name"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-sky-500"
+                    />
+                  </label>
+
+
+                  <label className="space-y-1.5 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">
+                      Due
+                    </span>
+
+                    <input
+                      type="datetime-local"
+                      value={
+                        housekeepingDueAt
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setHousekeepingDueAt(
+                          event.target.value,
+                        )
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-sky-500"
+                    />
+                  </label>
+                </div>
+
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={
+                      savingHousekeeping
+                    }
+                    onClick={() =>
+                      void handleCreateHousekeeping()
+                    }
+                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingHousekeeping
+                      ? "Saving..."
+                      : "Create task"}
+                  </button>
+                </div>
+              </div>
             )}
-          </div>
-        </section>
+          </section>
+
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold text-slate-950">
+                Turnover board
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-600">
+                Live readiness for the
+                resort&apos;s active rooms.
+              </p>
+            </div>
+
+
+            <div className="mt-6 space-y-5">
+              {cottages.map(
+                (cottage) => {
+                  const cottageRooms =
+                    activeRooms.filter(
+                      (room) =>
+                        room.cottage_id ===
+                        cottage.id,
+                    );
+
+                  if (
+                    cottageRooms.length ===
+                    0
+                  ) {
+                    return null;
+                  }
+
+                  return (
+                    <div
+                      key={
+                        cottage.id
+                      }
+                      className="rounded-2xl border border-slate-200 p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold text-slate-950">
+                            {
+                              cottage.name
+                            }
+                          </h3>
+
+                          <p className="text-xs font-medium text-slate-500">
+                            {
+                              cottage.code
+                            }
+                          </p>
+                        </div>
+
+                        <span className="text-xs font-medium text-slate-500">
+                          {
+                            cottageRooms.filter(
+                              (room) =>
+                                room.status ===
+                                "available",
+                            ).length
+                          }
+                          /
+                          {
+                            cottageRooms.length
+                          }{" "}
+                          ready
+                        </span>
+                      </div>
+
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        {cottageRooms.map(
+                          (room) => {
+                            const task =
+                              getActiveTaskForRoom(
+                                room.id,
+                              );
+
+                            return (
+                              <div
+                                key={
+                                  room.id
+                                }
+                                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="font-semibold text-slate-950">
+                                      {
+                                        room.name
+                                      }
+                                    </p>
+
+                                    <p className="mt-0.5 text-xs text-slate-500">
+                                      {
+                                        room.code
+                                      }
+                                    </p>
+                                  </div>
+
+                                  <span
+                                    className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${roomStatusClasses(
+                                      room.status,
+                                    )}`}
+                                  >
+                                    {
+                                      roomStatusLabel(
+                                        room.status,
+                                      )
+                                    }
+                                  </span>
+                                </div>
+
+
+                                {task && (
+                                  <div className="mt-3 rounded-xl bg-white p-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                      Active task
+                                    </p>
+
+                                    <p className="mt-1 text-sm font-medium text-slate-800">
+                                      {
+                                        task.title
+                                      }
+                                    </p>
+
+                                    {task.assigned_to && (
+                                      <p className="mt-1 text-xs text-slate-500">
+                                        Assigned to{" "}
+                                        {
+                                          task.assigned_to
+                                        }
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
+
+                                {room.status ===
+                                  "needs_cleaning" && (
+                                  <div className="mt-3">
+                                    {task ? (
+                                      <button
+                                        type="button"
+                                        disabled={
+                                          actionId ===
+                                          task.id
+                                        }
+                                        onClick={() =>
+                                          void handleHousekeepingStatus(
+                                            task.id,
+                                            "in_progress",
+                                          )
+                                        }
+                                        className="w-full rounded-xl bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                      >
+                                        Start cleaning
+                                      </button>
+                                    ) : (
+                                      <p className="rounded-xl border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                                        Room needs
+                                        cleaning but
+                                        has no active
+                                        housekeeping
+                                        task.
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
+
+                                {room.status ===
+                                  "cleaning" && (
+                                  <div className="mt-3">
+                                    {task ? (
+                                      <button
+                                        type="button"
+                                        disabled={
+                                          actionId ===
+                                          task.id
+                                        }
+                                        onClick={() =>
+                                          void handleHousekeepingStatus(
+                                            task.id,
+                                            "completed",
+                                          )
+                                        }
+                                        className="w-full rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                      >
+                                        Mark room ready
+                                      </button>
+                                    ) : (
+                                      <p className="rounded-xl border border-sky-200 bg-sky-50 p-2 text-xs text-sky-800">
+                                        Room is marked
+                                        cleaning but
+                                        has no active
+                                        task.
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+
+
+                                {room.status ===
+                                  "available" && (
+                                  <p className="mt-3 text-xs font-medium text-emerald-700">
+                                    Ready for guests
+                                  </p>
+                                )}
+                              </div>
+                            );
+                          },
+                        )}
+                      </div>
+                    </div>
+                  );
+                },
+              )}
+            </div>
+          </section>
+
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div>
+              <h2 className="text-xl font-bold text-slate-950">
+                Housekeeping tasks
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-600">
+                All current and completed
+                housekeeping work.
+              </p>
+            </div>
+
+
+            <div className="mt-5 space-y-3">
+              {housekeepingTasks.length ===
+              0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+                  <p className="text-sm text-slate-500">
+                    No housekeeping tasks.
+                  </p>
+                </div>
+              ) : (
+                housekeepingTasks.map(
+                  (task) => (
+                    <article
+                      key={
+                        task.id
+                      }
+                      className="rounded-2xl border border-slate-200 p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                            {
+                              housekeepingLocation(
+                                task,
+                              )
+                            }
+                          </p>
+
+                          <h3 className="mt-1 font-semibold text-slate-950">
+                            {
+                              task.title
+                            }
+                          </h3>
+
+                          {task.description && (
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                              {
+                                task.description
+                              }
+                            </p>
+                          )}
+                        </div>
+
+
+                        <div className="flex flex-wrap gap-2">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${priorityClasses(
+                              task.priority,
+                            )}`}
+                          >
+                            {
+                              task.priority
+                            }
+                          </span>
+
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${housekeepingStatusClasses(
+                              task.status,
+                            )}`}
+                          >
+                            {task.status ===
+                            "in_progress"
+                              ? "In progress"
+                              : task.status}
+                          </span>
+                        </div>
+                      </div>
+
+
+                      <div className="mt-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                        <p>
+                          Assigned:{" "}
+                          <span className="font-medium text-slate-700">
+                            {task.assigned_to ??
+                              "Unassigned"}
+                          </span>
+                        </p>
+
+                        <p>
+                          Due:{" "}
+                          <span className="font-medium text-slate-700">
+                            {
+                              formatDateTime(
+                                task.due_at,
+                              )
+                            }
+                          </span>
+                        </p>
+
+                        <p>
+                          Created:{" "}
+                          <span className="font-medium text-slate-700">
+                            {
+                              formatDateTime(
+                                task.created_at,
+                              )
+                            }
+                          </span>
+                        </p>
+                      </div>
+
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {task.status ===
+                          "open" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={
+                                actionId ===
+                                task.id
+                              }
+                              onClick={() =>
+                                void handleHousekeepingStatus(
+                                  task.id,
+                                  "in_progress",
+                                )
+                              }
+                              className="rounded-xl bg-sky-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:opacity-50"
+                            >
+                              Start cleaning
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={
+                                actionId ===
+                                task.id
+                              }
+                              onClick={() =>
+                                void handleHousekeepingStatus(
+                                  task.id,
+                                  "completed",
+                                )
+                              }
+                              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                            >
+                              Mark completed
+                            </button>
+                          </>
+                        )}
+
+
+                        {task.status ===
+                          "in_progress" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={
+                                actionId ===
+                                task.id
+                              }
+                              onClick={() =>
+                                void handleHousekeepingStatus(
+                                  task.id,
+                                  "open",
+                                )
+                              }
+                              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Move back to open
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={
+                                actionId ===
+                                task.id
+                              }
+                              onClick={() =>
+                                void handleHousekeepingStatus(
+                                  task.id,
+                                  "completed",
+                                )
+                              }
+                              className="rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50"
+                            >
+                              Mark completed
+                            </button>
+                          </>
+                        )}
+
+
+                        {task.status ===
+                          "completed" && (
+                          <button
+                            type="button"
+                            disabled={
+                              actionId ===
+                              task.id
+                            }
+                            onClick={() =>
+                              void handleHousekeepingStatus(
+                                task.id,
+                                "open",
+                              )
+                            }
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Reopen
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ),
+                )
+              )}
+            </div>
+          </section>
+        </>
       )}
+
 
       {viewMode ===
         "maintenance" && (
-        <section>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
-                Maintenance
-              </p>
+        <>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-violet-700">
+                  Resort upkeep
+                </p>
 
-              <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-                Maintenance issues
-              </h2>
-            </div>
+                <h2 className="mt-2 text-2xl font-bold text-slate-950">
+                  Maintenance
+                </h2>
 
-            <button
-              type="button"
-              onClick={() =>
-                setShowMaintenanceForm(
-                  (value) =>
-                    !value,
-                )
-              }
-              className="rounded-xl bg-violet-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-800"
-            >
-              Report issue
-            </button>
-          </div>
-
-          {showMaintenanceForm && (
-            <div className="mt-6 rounded-2xl border border-violet-100 bg-violet-50/50 p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <label>
-                  <span className="text-sm font-medium text-slate-700">
-                    Cottage
-                  </span>
-
-                  <select
-                    value={
-                      maintenanceCottage
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setMaintenanceCottage(
-                        event.target
-                          .value,
-                      )
-                    }
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                  >
-                    <option value="">
-                      General resort issue
-                    </option>
-
-                    {cottages.map(
-                      (cottage) => (
-                        <option
-                          key={
-                            cottage.id
-                          }
-                          value={
-                            cottage.id
-                          }
-                        >
-                          {
-                            cottage.code
-                          }{" "}
-                          —{" "}
-                          {
-                            cottage.name
-                          }
-                        </option>
-                      ),
-                    )}
-                  </select>
-                </label>
-
-                <label>
-                  <span className="text-sm font-medium text-slate-700">
-                    Priority
-                  </span>
-
-                  <select
-                    value={
-                      maintenancePriority
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setMaintenancePriority(
-                        event.target
-                          .value as TaskPriority,
-                      )
-                    }
-                    className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                  >
-                    <option value="low">
-                      Low
-                    </option>
-                    <option value="normal">
-                      Normal
-                    </option>
-                    <option value="high">
-                      High
-                    </option>
-                    <option value="urgent">
-                      Urgent
-                    </option>
-                  </select>
-                </label>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                  Report and track
+                  maintenance issues around
+                  cottages and shared resort
+                  areas.
+                </p>
               </div>
 
-              <label className="mt-4 block">
-                <span className="text-sm font-medium text-slate-700">
-                  Location
-                </span>
-
-                <input
-                  type="text"
-                  value={
-                    maintenanceLocation
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaintenanceLocation(
-                      event.target
-                        .value,
-                    )
-                  }
-                  placeholder="Front door, pool, event hall..."
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-sm font-medium text-slate-700">
-                  Issue
-                </span>
-
-                <input
-                  type="text"
-                  value={
-                    maintenanceTitle
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaintenanceTitle(
-                      event.target
-                        .value,
-                    )
-                  }
-                  placeholder="Broken door lock"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-sm font-medium text-slate-700">
-                  Description
-                </span>
-
-                <textarea
-                  rows={3}
-                  value={
-                    maintenanceDescription
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaintenanceDescription(
-                      event.target
-                        .value,
-                    )
-                  }
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                />
-              </label>
-
-              <label className="mt-4 block">
-                <span className="text-sm font-medium text-slate-700">
-                  Reported by
-                </span>
-
-                <input
-                  type="text"
-                  value={
-                    maintenanceReportedBy
-                  }
-                  onChange={(
-                    event,
-                  ) =>
-                    setMaintenanceReportedBy(
-                      event.target
-                        .value,
-                    )
-                  }
-                  placeholder="Staff name"
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-                />
-              </label>
-
-              <div className="mt-5 flex gap-3">
-                <button
-                  type="button"
-                  disabled={
-                    savingMaintenance
-                  }
-                  onClick={() =>
-                    void handleCreateMaintenance()
-                  }
-                  className="rounded-xl bg-violet-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  {savingMaintenance
-                    ? "Saving..."
-                    : "Report issue"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowMaintenanceForm(
-                      false,
-                    )
-                  }
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700"
-                >
-                  Cancel
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setShowMaintenanceForm(
+                    !showMaintenanceForm,
+                  )
+                }
+                className="rounded-2xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800"
+              >
+                {showMaintenanceForm
+                  ? "Close"
+                  : "Report issue"}
+              </button>
             </div>
-          )}
 
-          <div className="mt-6 grid gap-4 xl:grid-cols-2">
-            {maintenanceIssues.map(
-              (issue) => (
-                <article
-                  key={issue.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-400">
-                        MAINTENANCE #
-                        {issue.id}
-                      </p>
 
-                      <h3 className="mt-2 text-lg font-semibold text-slate-950">
-                        {issue.title}
-                      </h3>
+            {showMaintenanceForm && (
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <h3 className="font-semibold text-slate-950">
+                  Report maintenance issue
+                </h3>
 
-                      <p className="mt-1 text-sm text-slate-500">
-                        {issue.cottage_name ??
-                          "General resort"}
-                        {issue.location
-                          ? ` · ${issue.location}`
-                          : ""}
-                      </p>
-                    </div>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Cottage
+                    </span>
 
-                    <div className="flex flex-wrap gap-2">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${priorityClasses(
-                          issue.priority,
-                        )}`}
-                      >
-                        {
-                          issue.priority
-                        }
-                      </span>
-
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${maintenanceStatusClasses(
-                          issue.status,
-                        )}`}
-                      >
-                        {issue.status.replace(
-                          "_",
-                          " ",
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  {issue.description && (
-                    <p className="mt-4 text-sm leading-6 text-slate-600">
-                      {
-                        issue.description
+                    <select
+                      value={
+                        maintenanceCottage
                       }
-                    </p>
-                  )}
+                      onChange={(
+                        event,
+                      ) =>
+                        setMaintenanceCottage(
+                          event.target.value,
+                        )
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-violet-500"
+                    >
+                      <option value="">
+                        General resort
+                      </option>
 
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">
-                        Reported by
-                      </p>
+                      {cottages.map(
+                        (cottage) => (
+                          <option
+                            key={
+                              cottage.id
+                            }
+                            value={
+                              cottage.id
+                            }
+                          >
+                            {
+                              cottage.name
+                            }{" "}
+                            (
+                            {
+                              cottage.code
+                            }
+                            )
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
 
-                      <p className="mt-1 text-sm text-slate-700">
-                        {issue.reported_by ??
-                          "Not recorded"}
-                      </p>
-                    </div>
 
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">
-                        Reported
-                      </p>
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Location
+                    </span>
 
-                      <p className="mt-1 text-sm text-slate-700">
-                        {formatDateTime(
-                          issue.created_at,
-                        )}
-                      </p>
-                    </div>
-                  </div>
+                    <input
+                      value={
+                        maintenanceLocation
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setMaintenanceLocation(
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Example: Front door"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-violet-500"
+                    />
+                  </label>
 
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {issue.status !==
-                      "open" && (
-                      <button
-                        type="button"
-                        disabled={
-                          actionId ===
-                          issue.id
-                        }
-                        onClick={() =>
-                          void handleMaintenanceStatus(
-                            issue.id,
-                            "open",
-                          )
-                        }
-                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
-                      >
-                        Reopen
-                      </button>
-                    )}
 
-                    {issue.status !==
-                      "in_progress" && (
-                      <button
-                        type="button"
-                        disabled={
-                          actionId ===
-                          issue.id
-                        }
-                        onClick={() =>
-                          void handleMaintenanceStatus(
-                            issue.id,
-                            "in_progress",
-                          )
-                        }
-                        className="rounded-xl bg-violet-100 px-4 py-2 text-sm font-semibold text-violet-700"
-                      >
-                        Start work
-                      </button>
-                    )}
+                  <label className="space-y-1.5 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">
+                      Issue
+                    </span>
 
-                    {issue.status !==
-                      "resolved" && (
-                      <button
-                        type="button"
-                        disabled={
-                          actionId ===
-                          issue.id
-                        }
-                        onClick={() =>
-                          void handleMaintenanceStatus(
-                            issue.id,
-                            "resolved",
-                          )
-                        }
-                        className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
-                      >
-                        Mark resolved
-                      </button>
-                    )}
-                  </div>
-                </article>
-              ),
+                    <input
+                      value={
+                        maintenanceTitle
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setMaintenanceTitle(
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Example: Aircon not cooling"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-violet-500"
+                    />
+                  </label>
+
+
+                  <label className="space-y-1.5 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">
+                      Description
+                    </span>
+
+                    <textarea
+                      value={
+                        maintenanceDescription
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setMaintenanceDescription(
+                          event.target.value,
+                        )
+                      }
+                      rows={3}
+                      placeholder="Describe the problem"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-violet-500"
+                    />
+                  </label>
+
+
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Priority
+                    </span>
+
+                    <select
+                      value={
+                        maintenancePriority
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setMaintenancePriority(
+                          event.target
+                            .value as TaskPriority,
+                        )
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-violet-500"
+                    >
+                      <option value="low">
+                        Low
+                      </option>
+
+                      <option value="normal">
+                        Normal
+                      </option>
+
+                      <option value="high">
+                        High
+                      </option>
+
+                      <option value="urgent">
+                        Urgent
+                      </option>
+                    </select>
+                  </label>
+
+
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Reported by
+                    </span>
+
+                    <input
+                      value={
+                        maintenanceReportedBy
+                      }
+                      onChange={(
+                        event,
+                      ) =>
+                        setMaintenanceReportedBy(
+                          event.target.value,
+                        )
+                      }
+                      placeholder="Optional staff name"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-violet-500"
+                    />
+                  </label>
+                </div>
+
+
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={
+                      savingMaintenance
+                    }
+                    onClick={() =>
+                      void handleCreateMaintenance()
+                    }
+                    className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {savingMaintenance
+                      ? "Saving..."
+                      : "Report issue"}
+                  </button>
+                </div>
+              </div>
             )}
-          </div>
-        </section>
+          </section>
+
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-slate-950">
+              Maintenance issues
+            </h2>
+
+            <div className="mt-5 space-y-3">
+              {maintenanceIssues.length ===
+              0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+                  <p className="text-sm text-slate-500">
+                    No maintenance issues.
+                  </p>
+                </div>
+              ) : (
+                maintenanceIssues.map(
+                  (issue) => (
+                    <article
+                      key={
+                        issue.id
+                      }
+                      className="rounded-2xl border border-slate-200 p-4"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                            {issue.cottage_name ??
+                              "General resort"}
+
+                            {issue.location
+                              ? ` · ${issue.location}`
+                              : ""}
+                          </p>
+
+                          <h3 className="mt-1 font-semibold text-slate-950">
+                            {
+                              issue.title
+                            }
+                          </h3>
+
+                          {issue.description && (
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                              {
+                                issue.description
+                              }
+                            </p>
+                          )}
+                        </div>
+
+
+                        <div className="flex flex-wrap gap-2">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${priorityClasses(
+                              issue.priority,
+                            )}`}
+                          >
+                            {
+                              issue.priority
+                            }
+                          </span>
+
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${maintenanceStatusClasses(
+                              issue.status,
+                            )}`}
+                          >
+                            {issue.status ===
+                            "in_progress"
+                              ? "In progress"
+                              : issue.status}
+                          </span>
+                        </div>
+                      </div>
+
+
+                      <div className="mt-4 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                        <p>
+                          Reported by:{" "}
+                          <span className="font-medium text-slate-700">
+                            {issue.reported_by ??
+                              "Not set"}
+                          </span>
+                        </p>
+
+                        <p>
+                          Created:{" "}
+                          <span className="font-medium text-slate-700">
+                            {
+                              formatDateTime(
+                                issue.created_at,
+                              )
+                            }
+                          </span>
+                        </p>
+
+                        <p>
+                          Resolved:{" "}
+                          <span className="font-medium text-slate-700">
+                            {
+                              formatDateTime(
+                                issue.resolved_at,
+                              )
+                            }
+                          </span>
+                        </p>
+                      </div>
+
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {issue.status ===
+                          "open" && (
+                          <button
+                            type="button"
+                            disabled={
+                              actionId ===
+                              issue.id
+                            }
+                            onClick={() =>
+                              void handleMaintenanceStatus(
+                                issue.id,
+                                "in_progress",
+                              )
+                            }
+                            className="rounded-xl bg-violet-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:opacity-50"
+                          >
+                            Start work
+                          </button>
+                        )}
+
+
+                        {issue.status ===
+                          "in_progress" && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={
+                                actionId ===
+                                issue.id
+                              }
+                              onClick={() =>
+                                void handleMaintenanceStatus(
+                                  issue.id,
+                                  "open",
+                                )
+                              }
+                              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Reopen
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={
+                                actionId ===
+                                issue.id
+                              }
+                              onClick={() =>
+                                void handleMaintenanceStatus(
+                                  issue.id,
+                                  "resolved",
+                                )
+                              }
+                              className="rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50"
+                            >
+                              Mark resolved
+                            </button>
+                          </>
+                        )}
+
+
+                        {issue.status ===
+                          "open" && (
+                          <button
+                            type="button"
+                            disabled={
+                              actionId ===
+                              issue.id
+                            }
+                            onClick={() =>
+                              void handleMaintenanceStatus(
+                                issue.id,
+                                "resolved",
+                              )
+                            }
+                            className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-50"
+                          >
+                            Mark resolved
+                          </button>
+                        )}
+
+
+                        {issue.status ===
+                          "resolved" && (
+                          <button
+                            type="button"
+                            disabled={
+                              actionId ===
+                              issue.id
+                            }
+                            onClick={() =>
+                              void handleMaintenanceStatus(
+                                issue.id,
+                                "open",
+                              )
+                            }
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Reopen
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  ),
+                )
+              )}
+            </div>
+          </section>
+        </>
       )}
     </div>
   );

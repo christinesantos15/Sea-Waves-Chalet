@@ -14,12 +14,22 @@ export type TaskPriority =
   | "high"
   | "urgent";
 
+export type RoomReadinessStatus =
+  | "available"
+  | "needs_cleaning"
+  | "cleaning"
+  | string;
+
 export type HousekeepingTask = {
   id: number;
 
   cottage_id: number | null;
   cottage_code: string | null;
   cottage_name: string | null;
+
+  room_id: number | null;
+  room_code: string | null;
+  room_name: string | null;
 
   title: string;
   description: string | null;
@@ -61,27 +71,61 @@ export type CottageOption = {
   name: string;
 };
 
+export type RoomOption = {
+  id: number;
+  cottage_id: number;
+
+  cottage_code: string;
+  cottage_name: string;
+
+  code: string;
+  name: string;
+
+  status: RoomReadinessStatus;
+  is_active: boolean;
+};
+
 export type HousekeepingTaskCreate = {
   cottage_id: number | null;
+  room_id: number | null;
+
   title: string;
   description: string | null;
+
   priority: TaskPriority;
+
   assigned_to: string | null;
   due_at: string | null;
 };
 
 export type MaintenanceIssueCreate = {
   cottage_id: number | null;
+
   location: string | null;
+
   title: string;
   description: string | null;
+
   priority: TaskPriority;
+
   reported_by: string | null;
+};
+
+type RoomApiResponse = {
+  id: number;
+  cottage_id: number;
+
+  code: string;
+  name: string;
+
+  status: string;
+  is_active: boolean;
 };
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   "http://localhost:8001";
+
 
 async function readError(
   response: Response,
@@ -114,6 +158,7 @@ async function readError(
   return `Request failed: ${response.status}`;
 }
 
+
 export async function getCottageOptions(): Promise<
   CottageOption[]
 > {
@@ -142,6 +187,62 @@ export async function getCottageOptions(): Promise<
     }),
   );
 }
+
+
+export async function getRoomOptions(
+  cottages?: CottageOption[],
+): Promise<RoomOption[]> {
+  const cottageOptions =
+    cottages ??
+    (await getCottageOptions());
+
+  const roomGroups =
+    await Promise.all(
+      cottageOptions.map(
+        async (cottage) => {
+          const response = await fetch(
+            `${API_BASE_URL}/cottages/${cottage.id}/rooms`,
+            {
+              method: "GET",
+              cache: "no-store",
+            },
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              await readError(response),
+            );
+          }
+
+          const rooms =
+            (await response.json()) as RoomApiResponse[];
+
+          return rooms.map(
+            (room): RoomOption => ({
+              id: room.id,
+              cottage_id:
+                room.cottage_id,
+
+              cottage_code:
+                cottage.code,
+              cottage_name:
+                cottage.name,
+
+              code: room.code,
+              name: room.name,
+
+              status: room.status,
+              is_active:
+                room.is_active,
+            }),
+          );
+        },
+      ),
+    );
+
+  return roomGroups.flat();
+}
+
 
 export async function getHousekeepingTasks(
   status?: HousekeepingStatus,
@@ -180,6 +281,7 @@ export async function getHousekeepingTasks(
   >;
 }
 
+
 export async function createHousekeepingTask(
   data: HousekeepingTaskCreate,
 ): Promise<HousekeepingTask> {
@@ -205,6 +307,7 @@ export async function createHousekeepingTask(
     HousekeepingTask
   >;
 }
+
 
 export async function updateHousekeepingStatus(
   taskId: number,
@@ -234,6 +337,7 @@ export async function updateHousekeepingStatus(
     HousekeepingTask
   >;
 }
+
 
 export async function getMaintenanceIssues(
   status?: MaintenanceStatus,
@@ -272,6 +376,7 @@ export async function getMaintenanceIssues(
   >;
 }
 
+
 export async function createMaintenanceIssue(
   data: MaintenanceIssueCreate,
 ): Promise<MaintenanceIssue> {
@@ -297,6 +402,7 @@ export async function createMaintenanceIssue(
     MaintenanceIssue
   >;
 }
+
 
 export async function updateMaintenanceStatus(
   issueId: number,

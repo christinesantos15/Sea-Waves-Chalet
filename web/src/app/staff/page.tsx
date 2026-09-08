@@ -1,5 +1,6 @@
 import StaffOperationsDashboard from "@/components/staff/StaffOperationsDashboard";
 
+
 export default function StaffPage() {
   return (
     <main className="min-h-screen bg-slate-50">
@@ -20,10 +21,10 @@ export default function StaffPage() {
           </h1>
 
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-            Manage housekeeping,
-            cleaning work and
-            maintenance issues
-            around the resort.
+            Manage room readiness,
+            housekeeping, cleaning work
+            and maintenance around the
+            resort.
           </p>
         </header>
 
