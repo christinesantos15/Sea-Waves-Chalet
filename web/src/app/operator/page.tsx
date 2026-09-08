@@ -1,45 +1,59 @@
+import OperatorDailyOperations from "@/components/operator/OperatorDailyOperations";
 import OperatorReservationQueue from "@/components/operator/OperatorReservationQueue";
 
 export default function OperatorPage() {
   return (
     <main className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-sky-700">
-              Sea Waves
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <header className="mb-8">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-700">
+              Sea Waves Chalet
             </p>
 
-            <h1 className="mt-1 text-xl font-semibold text-slate-950">
-              Operator Control Center
-            </h1>
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+              Local development
+            </span>
           </div>
 
-          <div className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600">
-            Local development
-          </div>
-        </div>
-      </header>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+            Operator Control Center
+          </h1>
 
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        <div className="mb-10">
-          <p className="text-sm font-medium text-sky-700">
-            Reservations
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
+            Manage daily resort
+            operations,
+            reservations,
+            arrivals, departures
+            and guest stays.
           </p>
+        </header>
 
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-            Booking requests
-          </h2>
+        <div className="space-y-10">
+          <OperatorDailyOperations />
 
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Review website booking requests,
-            confirm valid reservations, and
-            decline requests that cannot be
-            accepted.
-          </p>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div className="mb-8">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                Reservation
+                Management
+              </p>
+
+              <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                All reservations
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Review booking
+                requests and manage
+                reservation
+                lifecycle status.
+              </p>
+            </div>
+
+            <OperatorReservationQueue />
+          </section>
         </div>
-
-        <OperatorReservationQueue />
       </div>
     </main>
   );

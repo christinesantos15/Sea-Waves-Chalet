@@ -86,6 +86,22 @@ export type OperatorPaymentCreate = {
   notes: string | null;
 };
 
+export type OperatorDailyOperationsCounts = {
+  arrivals: number;
+  staying: number;
+  departures: number;
+};
+
+export type OperatorDailyOperations = {
+  date: string;
+
+  counts: OperatorDailyOperationsCounts;
+
+  arrivals: OperatorReservation[];
+  staying: OperatorReservation[];
+  departures: OperatorReservation[];
+};
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   "http://localhost:8001";
@@ -290,5 +306,31 @@ export async function recordReservationPayment(
 
   return response.json() as Promise<
     OperatorPaymentSummary
+  >;
+}
+
+export async function getOperatorDailyOperations(
+  date: string,
+): Promise<OperatorDailyOperations> {
+  const params = new URLSearchParams({
+    date,
+  });
+
+  const response = await fetch(
+    `${API_BASE_URL}/operator/daily-operations?${params.toString()}`,
+    {
+      method: "GET",
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorDailyOperations
   >;
 }
