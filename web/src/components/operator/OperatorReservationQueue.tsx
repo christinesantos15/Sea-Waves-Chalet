@@ -697,6 +697,7 @@ export default function OperatorReservationQueue() {
                             cottage.rooms.some(
                               (room) =>
                                 room.is_active &&
+                                room.status === "available" &&
                                 room.room_type_id ===
                                   reservation.room_type_id,
                             ),
@@ -722,7 +723,8 @@ export default function OperatorReservationQueue() {
                       ? selectedCottage.rooms.filter(
                           (room) =>
                             room.is_active &&
-                            room.room_type_id ===
+                            room.status === "available" &&
+                                room.room_type_id ===
                               reservation.room_type_id,
                         )
                       : [];
@@ -973,14 +975,15 @@ export default function OperatorReservationQueue() {
                           0 ? (
                             <div className="mt-4 rounded-xl border border-amber-200 bg-white p-4">
                               <p className="text-sm font-medium text-slate-800">
-                                No matching physical rooms
-                                are mapped yet.
+                                No available matching
+                                physical rooms.
                               </p>
 
                               <p className="mt-1 text-xs leading-5 text-slate-500">
-                                Assign this room type to
-                                a physical room under
-                                Cottages first.
+                                A matching room must be
+                                active, available, and
+                                mapped to this room type
+                                before it can be assigned.
                               </p>
                             </div>
                           ) : (
