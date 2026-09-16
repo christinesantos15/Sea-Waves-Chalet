@@ -1,10 +1,17 @@
 import CustomerPropertyMap from "@/components/customer-map/CustomerPropertyMap";
+import PublicPricingSection from "@/components/public/PublicPricingSection";
+import { getPublicPricing } from "@/lib/publicPricingApi";
 import { getPropertyMapLocations } from "@/lib/resortApi";
 
 
 export default async function Home() {
-  const locations =
-    await getPropertyMapLocations();
+  const [
+    locations,
+    pricing,
+  ] = await Promise.all([
+    getPropertyMapLocations(),
+    getPublicPricing(),
+  ]);
 
   return (
     <main className="min-h-screen bg-[#f7fafb] text-slate-950">
@@ -29,6 +36,13 @@ export default async function Home() {
               className="hidden text-sm font-medium text-slate-600 transition hover:text-slate-950 sm:block"
             >
               Explore
+            </a>
+
+            <a
+              href="#rates"
+              className="hidden text-sm font-medium text-slate-600 transition hover:text-slate-950 sm:block"
+            >
+              Rates
             </a>
 
             <a
@@ -128,6 +142,11 @@ export default async function Home() {
           locations={locations}
         />
       </section>
+
+      <PublicPricingSection
+        roomTypes={pricing.roomTypes}
+        extraCharges={pricing.extraCharges}
+      />
 
       <section
         id="stay"

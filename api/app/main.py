@@ -13,6 +13,10 @@ from app.routers.availability import (
     router as availability_router,
 )
 
+from app.routers.pricing import (
+    router as pricing_router,
+)
+
 from app.routers.reservations import (
     router as reservations_router,
 )
@@ -85,6 +89,11 @@ app.include_router(
 
 app.include_router(
     availability_router
+)
+
+
+app.include_router(
+    pricing_router
 )
 
 app.include_router(
