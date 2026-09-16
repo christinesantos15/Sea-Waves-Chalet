@@ -35,6 +35,15 @@ class Room(Base):
         index=True,
     )
 
+    room_type_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "room_types.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
     code: Mapped[str] = mapped_column(
         String(50),
     )

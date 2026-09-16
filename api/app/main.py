@@ -41,6 +41,10 @@ from app.routers.operator_cottages import (
     router as operator_cottages_router,
 )
 
+from app.routers.operator_pricing import (
+    router as operator_pricing_router,
+)
+
 from app.routers.staff_operations import (
     router as staff_operations_router,
 )
@@ -111,6 +115,11 @@ app.include_router(
 
 app.include_router(
     operator_cottages_router
+)
+
+
+app.include_router(
+    operator_pricing_router
 )
 
 
