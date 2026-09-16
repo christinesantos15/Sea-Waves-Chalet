@@ -1,3 +1,4 @@
+from sqlalchemy import update
 from fastapi import (
     APIRouter,
     Depends,
@@ -27,6 +28,8 @@ from app.schemas.operator_guest import (
     OperatorGuestDuplicateMatch,
     OperatorGuestInquiryHistory,
     OperatorGuestListItem,
+    OperatorGuestMergeRequest,
+    OperatorGuestMergeResponse,
     OperatorGuestReservationHistory,
     OperatorGuestUpdate,
 )
@@ -438,6 +441,298 @@ def list_duplicate_guests(
             )
 
     return candidates
+
+
+@router.post(
+    "/merge",
+    response_model=OperatorGuestMergeResponse,
+)
+def merge_guests(
+    data: OperatorGuestMergeRequest,
+    db: Session = Depends(get_db),
+):
+    from app.services.guest_identity import (
+        compare_guest_identity,
+    )
+
+    if (
+        data.canonical_guest_id
+        == data.duplicate_guest_id
+    ):
+        raise HTTPException(
+            status_code=(
+                status.HTTP_422_UNPROCESSABLE_ENTITY
+            ),
+            detail=(
+                "Canonical and duplicate "
+                "guest must be different."
+            ),
+        )
+
+    try:
+        guest_ids = sorted(
+            [
+                data.canonical_guest_id,
+                data.duplicate_guest_id,
+            ]
+        )
+
+        locked_guests = list(
+            db.scalars(
+                select(Guest)
+                .where(
+                    Guest.id.in_(
+                        guest_ids
+                    )
+                )
+                .order_by(
+                    Guest.id.asc()
+                )
+                .with_for_update()
+            ).all()
+        )
+
+        guests_by_id = {
+            guest.id: guest
+            for guest
+            in locked_guests
+        }
+
+        canonical = guests_by_id.get(
+            data.canonical_guest_id
+        )
+
+        duplicate = guests_by_id.get(
+            data.duplicate_guest_id
+        )
+
+        if canonical is None:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                ),
+                detail=(
+                    "Canonical guest "
+                    "not found."
+                ),
+            )
+
+        if duplicate is None:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                ),
+                detail=(
+                    "Duplicate guest "
+                    "not found."
+                ),
+            )
+
+        identity_matches = (
+            compare_guest_identity(
+                canonical,
+                duplicate,
+            )
+        )
+
+        if not identity_matches:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "These guests do not "
+                    "share a matching "
+                    "identity field."
+                ),
+            )
+
+        matching_fields = {
+            match.field
+            for match
+            in identity_matches
+        }
+
+        alternate_contacts: list[
+            str
+        ] = []
+
+        contact_fields = (
+            (
+                "phone",
+                "Phone",
+            ),
+            (
+                "email",
+                "Email",
+            ),
+            (
+                "facebook_name",
+                "Facebook",
+            ),
+            (
+                "messenger_psid",
+                "Messenger PSID",
+            ),
+        )
+
+        for (
+            field,
+            label,
+        ) in contact_fields:
+            canonical_value = (
+                clean_optional(
+                    getattr(
+                        canonical,
+                        field,
+                    )
+                )
+            )
+
+            duplicate_value = (
+                clean_optional(
+                    getattr(
+                        duplicate,
+                        field,
+                    )
+                )
+            )
+
+            if (
+                not canonical_value
+                and duplicate_value
+            ):
+                setattr(
+                    canonical,
+                    field,
+                    duplicate_value,
+                )
+
+            elif (
+                canonical_value
+                and duplicate_value
+                and field
+                not in matching_fields
+            ):
+                alternate_contacts.append(
+                    f"{label}: "
+                    f"{duplicate_value}"
+                )
+
+        notes: list[str] = []
+
+        canonical_notes = (
+            clean_optional(
+                canonical.notes
+            )
+        )
+
+        duplicate_notes = (
+            clean_optional(
+                duplicate.notes
+            )
+        )
+
+        if canonical_notes:
+            notes.append(
+                canonical_notes
+            )
+
+        if (
+            duplicate_notes
+            and duplicate_notes
+            != canonical_notes
+        ):
+            notes.append(
+                "Merged from guest "
+                f"#{duplicate.id}: "
+                f"{duplicate_notes}"
+            )
+
+        if alternate_contacts:
+            notes.append(
+                "Alternate contact "
+                "information from guest "
+                f"#{duplicate.id}: "
+                + "; ".join(
+                    alternate_contacts
+                )
+            )
+
+        canonical.notes = (
+            "\n\n".join(notes)
+            if notes
+            else None
+        )
+
+        inquiry_result = db.execute(
+            update(Inquiry)
+            .where(
+                Inquiry.guest_id
+                == duplicate.id
+            )
+            .values(
+                guest_id=canonical.id
+            )
+        )
+
+        reservation_result = db.execute(
+            update(Reservation)
+            .where(
+                Reservation.guest_id
+                == duplicate.id
+            )
+            .values(
+                guest_id=canonical.id
+            )
+        )
+
+        moved_inquiries = (
+            inquiry_result.rowcount
+            or 0
+        )
+
+        moved_reservations = (
+            reservation_result.rowcount
+            or 0
+        )
+
+        merged_guest_id = (
+            duplicate.id
+        )
+
+        db.delete(duplicate)
+
+        db.flush()
+        db.commit()
+
+        db.refresh(canonical)
+
+        return OperatorGuestMergeResponse(
+            canonical_guest=(
+                build_guest_detail(
+                    db,
+                    canonical,
+                )
+            ),
+            merged_guest_id=(
+                merged_guest_id
+            ),
+            moved_inquiries=(
+                moved_inquiries
+            ),
+            moved_reservations=(
+                moved_reservations
+            ),
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.get(

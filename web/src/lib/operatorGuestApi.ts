@@ -1,6 +1,5 @@
 export type OperatorGuest = {
   id: number;
-
   full_name: string;
 
   phone: string | null;
@@ -59,9 +58,11 @@ export type OperatorGuestReservationHistory = {
 
 export type OperatorGuestDetail =
   OperatorGuest & {
-    inquiries: OperatorGuestInquiryHistory[];
+    inquiries:
+      OperatorGuestInquiryHistory[];
 
-    reservations: OperatorGuestReservationHistory[];
+    reservations:
+      OperatorGuestReservationHistory[];
   };
 
 
@@ -83,8 +84,35 @@ export type OperatorGuestFilters = {
 };
 
 
+export type OperatorGuestDuplicateMatch = {
+  field: string;
+  value: string;
+};
+
+
+export type OperatorGuestDuplicateCandidate = {
+  guest_a: OperatorGuest;
+  guest_b: OperatorGuest;
+
+  matches:
+    OperatorGuestDuplicateMatch[];
+};
+
+
+export type OperatorGuestMergeResponse = {
+  canonical_guest:
+    OperatorGuestDetail;
+
+  merged_guest_id: number;
+
+  moved_inquiries: number;
+  moved_reservations: number;
+};
+
+
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
+  process.env
+    .NEXT_PUBLIC_API_BASE_URL ??
   "http://localhost:8001";
 
 
@@ -116,12 +144,16 @@ async function readError(
     }
   }
 
-  return `Request failed: ${response.status}`;
+  return (
+    `Request failed: ` +
+    `${response.status}`
+  );
 }
 
 
 export async function getOperatorGuests(
-  filters: OperatorGuestFilters = {},
+  filters:
+    OperatorGuestFilters = {},
 ): Promise<OperatorGuest[]> {
   const params =
     new URLSearchParams();
@@ -139,20 +171,33 @@ export async function getOperatorGuests(
   const queryString =
     params.toString();
 
-  const response = await fetch(
+  const url =
     queryString
-      ? `${API_BASE_URL}/operator/guests?${queryString}`
-      : `${API_BASE_URL}/operator/guests`,
-    {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
+      ? (
+          `${API_BASE_URL}` +
+          `/operator/guests?` +
+          queryString
+        )
+      : (
+          `${API_BASE_URL}` +
+          `/operator/guests`
+        );
+
+  const response =
+    await fetch(
+      url,
+      {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      },
+    );
 
   if (!response.ok) {
     throw new Error(
-      await readError(response),
+      await readError(
+        response,
+      ),
     );
   }
 
@@ -165,18 +210,23 @@ export async function getOperatorGuests(
 export async function getOperatorGuest(
   guestId: number,
 ): Promise<OperatorGuestDetail> {
-  const response = await fetch(
-    `${API_BASE_URL}/operator/guests/${guestId}`,
-    {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
+  const response =
+    await fetch(
+      `${API_BASE_URL}` +
+        `/operator/guests/` +
+        `${guestId}`,
+      {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      },
+    );
 
   if (!response.ok) {
     throw new Error(
-      await readError(response),
+      await readError(
+        response,
+      ),
     );
   }
 
@@ -190,26 +240,34 @@ export async function updateOperatorGuest(
   guestId: number,
   data: OperatorGuestUpdate,
 ): Promise<OperatorGuestDetail> {
-  const response = await fetch(
-    `${API_BASE_URL}/operator/guests/${guestId}`,
-    {
-      method: "PATCH",
-      credentials: "include",
+  const response =
+    await fetch(
+      `${API_BASE_URL}` +
+        `/operator/guests/` +
+        `${guestId}`,
+      {
+        method: "PATCH",
 
-      headers: {
-        "Content-Type":
-          "application/json",
+        credentials:
+          "include",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify(
+            data,
+          ),
       },
-
-      body: JSON.stringify(
-        data,
-      ),
-    },
-  );
+    );
 
   if (!response.ok) {
     throw new Error(
-      await readError(response),
+      await readError(
+        response,
+      ),
     );
   }
 
@@ -219,39 +277,73 @@ export async function updateOperatorGuest(
 }
 
 
-export type OperatorGuestDuplicateMatch = {
-  field: string;
-  value: string;
-};
-
-
-export type OperatorGuestDuplicateCandidate = {
-  guest_a: OperatorGuest;
-  guest_b: OperatorGuest;
-
-  matches: OperatorGuestDuplicateMatch[];
-};
-
-
 export async function getOperatorGuestDuplicates(): Promise<
   OperatorGuestDuplicateCandidate[]
 > {
-  const response = await fetch(
-    `${API_BASE_URL}/operator/guests/duplicates`,
-    {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
+  const response =
+    await fetch(
+      `${API_BASE_URL}` +
+        `/operator/guests/duplicates`,
+      {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      },
+    );
 
   if (!response.ok) {
     throw new Error(
-      await readError(response),
+      await readError(
+        response,
+      ),
     );
   }
 
   return response.json() as Promise<
     OperatorGuestDuplicateCandidate[]
+  >;
+}
+
+
+export async function mergeOperatorGuests(
+  canonicalGuestId: number,
+  duplicateGuestId: number,
+): Promise<OperatorGuestMergeResponse> {
+  const response =
+    await fetch(
+      `${API_BASE_URL}` +
+        `/operator/guests/merge`,
+      {
+        method: "POST",
+
+        credentials:
+          "include",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            canonical_guest_id:
+              canonicalGuestId,
+
+            duplicate_guest_id:
+              duplicateGuestId,
+          }),
+      },
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(
+        response,
+      ),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorGuestMergeResponse
   >;
 }
