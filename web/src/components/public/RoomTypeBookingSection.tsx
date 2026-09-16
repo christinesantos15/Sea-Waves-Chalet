@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -145,6 +146,81 @@ export default function RoomTypeBookingSection({
   ] = useState<
     RoomTypeReservationResponse | null
   >(null);
+
+
+  useEffect(() => {
+    function handleRoomTypeSelection(
+      event: Event,
+    ) {
+      const customEvent =
+        event as CustomEvent<{
+          roomTypeId: number;
+        }>;
+
+      const roomType =
+        roomTypes.find(
+          (candidate) =>
+            candidate.id ===
+            customEvent.detail
+              .roomTypeId,
+        );
+
+      if (!roomType) {
+        return;
+      }
+
+      setSelectedRoomTypeId(
+        String(roomType.id),
+      );
+
+      const hasBreakfast =
+        roomType.rates.some(
+          (rate) =>
+            rate.rate_plan ===
+            "with_breakfast",
+        );
+
+      const hasRoomOnly =
+        roomType.rates.some(
+          (rate) =>
+            rate.rate_plan ===
+            "without_breakfast",
+        );
+
+      if (hasBreakfast) {
+        setRatePlan(
+          "with_breakfast",
+        );
+      } else if (hasRoomOnly) {
+        setRatePlan(
+          "without_breakfast",
+        );
+      }
+
+      setGuestCount(
+        (current) =>
+          Math.min(
+            Math.max(current, 1),
+            roomType.capacity,
+          ),
+      );
+
+      setError(null);
+      setSuccess(null);
+    }
+
+    window.addEventListener(
+      "sea-waves:select-room-type",
+      handleRoomTypeSelection,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "sea-waves:select-room-type",
+        handleRoomTypeSelection,
+      );
+    };
+  }, [roomTypes]);
 
 
   const selectedRoomType =
