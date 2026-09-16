@@ -1,3 +1,5 @@
+import BookRoomTypeButton from "@/components/public/BookRoomTypeButton";
+
 import type {
   PublicExtraCharge,
   PublicRoomRate,
@@ -152,6 +154,11 @@ export default function PublicPricingSection({
                       </p>
                     </div>
                   </div>
+
+                  <BookRoomTypeButton
+                    roomTypeId={roomType.id}
+                    roomTypeName={roomType.name}
+                  />
                 </article>
               );
             },
