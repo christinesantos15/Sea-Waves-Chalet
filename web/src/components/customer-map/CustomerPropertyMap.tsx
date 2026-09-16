@@ -459,6 +459,104 @@ export default function CustomerPropertyMap({
               {cottageDetail &&
                 !loadingCottage && (
                   <>
+                    {cottageDetail.media.length > 0 && (() => {
+                      const cover =
+                        cottageDetail.media.find(
+                          (item) => item.is_cover,
+                        ) ??
+                        cottageDetail.media[0];
+
+                      const remaining =
+                        cottageDetail.media.filter(
+                          (item) =>
+                            item.id !== cover.id,
+                        );
+
+                      return (
+                        <div className="mt-6">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                            Cottage gallery
+                          </p>
+
+                          <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                            {cover.media_type ===
+                            "video" ? (
+                              <video
+                                src={cover.url}
+                                controls
+                                preload="metadata"
+                                className="aspect-video w-full bg-slate-950 object-cover"
+                              />
+                            ) : (
+                              <img
+                                src={cover.url}
+                                alt={
+                                  cover.alt_text ??
+                                  cover.caption ??
+                                  `${selected.name} photo`
+                                }
+                                className="aspect-video w-full object-cover"
+                              />
+                            )}
+                          </div>
+
+                          {cover.caption && (
+                            <p className="mt-2 text-sm leading-6 text-slate-500">
+                              {cover.caption}
+                            </p>
+                          )}
+
+                          {remaining.length >
+                            0 && (
+                            <div className="mt-3 grid grid-cols-2 gap-3">
+                              {remaining.map(
+                                (item) => (
+                                  <div
+                                    key={
+                                      item.id
+                                    }
+                                    className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                                  >
+                                    {item.media_type ===
+                                    "video" ? (
+                                      <video
+                                        src={
+                                          item.url
+                                        }
+                                        controls
+                                        preload="metadata"
+                                        className="aspect-video w-full bg-slate-950 object-cover"
+                                      />
+                                    ) : (
+                                      <img
+                                        src={
+                                          item.url
+                                        }
+                                        alt={
+                                          item.alt_text ??
+                                          item.caption ??
+                                          `${selected.name} photo`
+                                        }
+                                        className="aspect-video w-full object-cover"
+                                      />
+                                    )}
+
+                                    {item.caption && (
+                                      <p className="bg-white px-3 py-2 text-xs leading-5 text-slate-600">
+                                        {
+                                          item.caption
+                                        }
+                                      </p>
+                                    )}
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     <div className="mt-6 flex items-start justify-between gap-3">
                       <div>
                         <h4 className="font-semibold text-slate-950">
