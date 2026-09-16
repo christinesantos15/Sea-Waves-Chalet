@@ -1,7 +1,4 @@
-from datetime import (
-    datetime,
-    timezone,
-)
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -9,13 +6,19 @@ from fastapi import (
     APIRouter,
     Depends,
     HTTPException,
+    Query,
     status,
 )
-from sqlalchemy import select
+
+from sqlalchemy import (
+    or_,
+    select,
+)
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies.auth import require_roles
+
 from app.models import (
     Cottage,
     Guest,
@@ -23,12 +26,16 @@ from app.models import (
     Reservation,
     Room,
 )
+
 from app.schemas.operator_inquiry import (
+    InquirySource,
+    InquiryStatus,
     OperatorInquiryConvertRequest,
     OperatorInquiryConversionResponse,
     OperatorInquiryCreate,
     OperatorInquiryResponse,
     OperatorInquiryStatusUpdate,
+    OperatorInquiryUpdate,
 )
 
 
@@ -74,13 +81,11 @@ BLOCKING_RESERVATION_STATUSES = (
 )
 
 
-def utc_now() -> datetime:
-    return datetime.now(
-        timezone.utc,
-    )
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
-def generate_reference() -> str:
+def generate_reference():
     return (
         f"SW-{uuid4().hex[:12].upper()}"
     )
@@ -94,11 +99,7 @@ def clean_optional(
 
     cleaned = value.strip()
 
-    return (
-        cleaned
-        if cleaned
-        else None
-    )
+    return cleaned if cleaned else None
 
 
 def build_inquiry_response(
@@ -107,26 +108,18 @@ def build_inquiry_response(
 ) -> OperatorInquiryResponse:
     return OperatorInquiryResponse(
         id=inquiry.id,
-
         guest_id=guest.id,
         guest_name=guest.full_name,
-
         guest_phone=guest.phone,
         guest_email=guest.email,
-
         facebook_name=guest.facebook_name,
         messenger_psid=guest.messenger_psid,
-
         source=inquiry.source,
         status=inquiry.status,
-
         check_in=inquiry.check_in,
         check_out=inquiry.check_out,
-
         guest_count=inquiry.guest_count,
-
         message=inquiry.message,
-
         created_at=inquiry.created_at,
     )
 
@@ -134,10 +127,7 @@ def build_inquiry_response(
 def get_inquiry_with_guest(
     db: Session,
     inquiry_id: int,
-) -> tuple[
-    Inquiry,
-    Guest,
-]:
+) -> tuple[Inquiry, Guest]:
     row = db.execute(
         select(
             Inquiry,
@@ -145,12 +135,10 @@ def get_inquiry_with_guest(
         )
         .join(
             Guest,
-            Guest.id
-            == Inquiry.guest_id,
+            Guest.id == Inquiry.guest_id,
         )
         .where(
-            Inquiry.id
-            == inquiry_id,
+            Inquiry.id == inquiry_id,
         )
     ).first()
 
@@ -162,10 +150,7 @@ def get_inquiry_with_guest(
 
     inquiry, guest = row
 
-    return (
-        inquiry,
-        guest,
-    )
+    return inquiry, guest
 
 
 @router.get(
@@ -175,10 +160,19 @@ def get_inquiry_with_guest(
     ],
 )
 def list_inquiries(
+    q: str | None = Query(
+        default=None,
+        max_length=200,
+    ),
+    inquiry_status: InquiryStatus | None = Query(
+        default=None,
+        alias="status",
+    ),
+    source: InquirySource | None = Query(
+        default=None,
+    ),
     db: Session = Depends(get_db),
-) -> list[
-    OperatorInquiryResponse
-]:
+):
     statement = (
         select(
             Inquiry,
@@ -186,17 +180,41 @@ def list_inquiries(
         )
         .join(
             Guest,
-            Guest.id
-            == Inquiry.guest_id,
-        )
-        .order_by(
-            Inquiry.created_at.desc(),
-            Inquiry.id.desc(),
+            Guest.id == Inquiry.guest_id,
         )
     )
 
+    if inquiry_status is not None:
+        statement = statement.where(
+            Inquiry.status == inquiry_status
+        )
+
+    if source is not None:
+        statement = statement.where(
+            Inquiry.source == source
+        )
+
+    if q is not None:
+        cleaned_query = q.strip()
+
+        if cleaned_query:
+            search_term = f"%{cleaned_query}%"
+
+            statement = statement.where(
+                or_(
+                    Guest.full_name.ilike(search_term),
+                    Guest.phone.ilike(search_term),
+                    Guest.email.ilike(search_term),
+                    Guest.facebook_name.ilike(search_term),
+                    Inquiry.message.ilike(search_term),
+                )
+            )
+
     rows = db.execute(
-        statement,
+        statement.order_by(
+            Inquiry.created_at.desc(),
+            Inquiry.id.desc(),
+        )
     ).all()
 
     return [
@@ -204,8 +222,7 @@ def list_inquiries(
             inquiry,
             guest,
         )
-        for inquiry, guest
-        in rows
+        for inquiry, guest in rows
     ]
 
 
@@ -217,11 +234,8 @@ def list_inquiries(
 def create_inquiry(
     data: OperatorInquiryCreate,
     db: Session = Depends(get_db),
-) -> OperatorInquiryResponse:
-    full_name = (
-        data.full_name
-        .strip()
-    )
+):
+    full_name = data.full_name.strip()
 
     if not full_name:
         raise HTTPException(
@@ -232,66 +246,197 @@ def create_inquiry(
     try:
         guest = Guest(
             full_name=full_name,
-
             phone=clean_optional(
-                data.phone,
+                data.phone
             ),
-
             email=clean_optional(
-                data.email,
+                data.email
             ),
-
             facebook_name=clean_optional(
-                data.facebook_name,
+                data.facebook_name
             ),
-
             messenger_psid=clean_optional(
-                data.messenger_psid,
+                data.messenger_psid
             ),
-
             notes=(
                 "Created from resort inquiry."
             ),
         )
 
-        db.add(
-            guest,
-        )
+        db.add(guest)
         db.flush()
 
         inquiry = Inquiry(
             guest_id=guest.id,
-
             source=data.source,
             status="new",
-
             check_in=data.check_in,
             check_out=data.check_out,
-
             guest_count=data.guest_count,
-
             message=clean_optional(
-                data.message,
+                data.message
             ),
-
             created_at=utc_now(),
         )
 
-        db.add(
-            inquiry,
-        )
+        db.add(inquiry)
         db.flush()
 
-        response = (
-            build_inquiry_response(
-                inquiry,
-                guest,
-            )
+        response = build_inquiry_response(
+            inquiry,
+            guest,
         )
 
         db.commit()
 
         return response
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.patch(
+    "/{inquiry_id}",
+    response_model=OperatorInquiryResponse,
+)
+def update_inquiry(
+    inquiry_id: int,
+    data: OperatorInquiryUpdate,
+    db: Session = Depends(get_db),
+):
+    inquiry, guest = (
+        get_inquiry_with_guest(
+            db,
+            inquiry_id,
+        )
+    )
+
+    if inquiry.status == "converted":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Converted inquiries cannot "
+                "be edited."
+            ),
+        )
+
+    fields = data.model_fields_set
+
+    next_check_in = (
+        data.check_in
+        if "check_in" in fields
+        else inquiry.check_in
+    )
+
+    next_check_out = (
+        data.check_out
+        if "check_out" in fields
+        else inquiry.check_out
+    )
+
+    if (
+        next_check_in is not None
+        and next_check_out is not None
+        and next_check_out <= next_check_in
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Check-out must be "
+                "after check-in."
+            ),
+        )
+
+    try:
+        if "full_name" in fields:
+            if data.full_name is None:
+                raise HTTPException(
+                    status_code=(
+                        status.HTTP_422_UNPROCESSABLE_ENTITY
+                    ),
+                    detail=(
+                        "Guest name cannot "
+                        "be empty."
+                    ),
+                )
+
+            full_name = (
+                data.full_name.strip()
+            )
+
+            if not full_name:
+                raise HTTPException(
+                    status_code=(
+                        status.HTTP_422_UNPROCESSABLE_ENTITY
+                    ),
+                    detail=(
+                        "Guest name cannot "
+                        "be empty."
+                    ),
+                )
+
+            guest.full_name = full_name
+
+        if "phone" in fields:
+            guest.phone = clean_optional(
+                data.phone
+            )
+
+        if "email" in fields:
+            guest.email = clean_optional(
+                data.email
+            )
+
+        if "facebook_name" in fields:
+            guest.facebook_name = (
+                clean_optional(
+                    data.facebook_name
+                )
+            )
+
+        if "messenger_psid" in fields:
+            guest.messenger_psid = (
+                clean_optional(
+                    data.messenger_psid
+                )
+            )
+
+        if "check_in" in fields:
+            inquiry.check_in = (
+                data.check_in
+            )
+
+        if "check_out" in fields:
+            inquiry.check_out = (
+                data.check_out
+            )
+
+        if "guest_count" in fields:
+            inquiry.guest_count = (
+                data.guest_count
+            )
+
+        if "message" in fields:
+            inquiry.message = (
+                clean_optional(
+                    data.message
+                )
+            )
+
+        db.commit()
+
+        db.refresh(guest)
+        db.refresh(inquiry)
+
+        return build_inquiry_response(
+            inquiry,
+            guest,
+        )
 
     except HTTPException:
         db.rollback()
@@ -310,7 +455,7 @@ def update_inquiry_status(
     inquiry_id: int,
     data: OperatorInquiryStatusUpdate,
     db: Session = Depends(get_db),
-) -> OperatorInquiryResponse:
+):
     inquiry, guest = (
         get_inquiry_with_guest(
             db,
@@ -318,18 +463,10 @@ def update_inquiry_status(
         )
     )
 
-    current_status = (
-        inquiry.status
-    )
+    current_status = inquiry.status
+    target_status = data.status
 
-    target_status = (
-        data.status
-    )
-
-    if (
-        target_status
-        == current_status
-    ):
+    if target_status == current_status:
         return build_inquiry_response(
             inquiry,
             guest,
@@ -342,10 +479,7 @@ def update_inquiry_status(
         )
     )
 
-    if (
-        target_status
-        not in allowed_targets
-    ):
+    if target_status not in allowed_targets:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
@@ -355,14 +489,10 @@ def update_inquiry_status(
             ),
         )
 
-    inquiry.status = (
-        target_status
-    )
+    inquiry.status = target_status
 
     db.commit()
-    db.refresh(
-        inquiry,
-    )
+    db.refresh(inquiry)
 
     return build_inquiry_response(
         inquiry,
@@ -372,14 +502,16 @@ def update_inquiry_status(
 
 @router.post(
     "/{inquiry_id}/convert",
-    response_model=OperatorInquiryConversionResponse,
+    response_model=(
+        OperatorInquiryConversionResponse
+    ),
     status_code=status.HTTP_201_CREATED,
 )
 def convert_inquiry_to_reservation(
     inquiry_id: int,
     data: OperatorInquiryConvertRequest,
     db: Session = Depends(get_db),
-) -> OperatorInquiryConversionResponse:
+):
     try:
         inquiry, guest = (
             get_inquiry_with_guest(
@@ -399,24 +531,21 @@ def convert_inquiry_to_reservation(
 
         existing_reservation = db.scalar(
             select(
-                Reservation.id,
+                Reservation.id
             )
             .where(
                 Reservation.inquiry_id
-                == inquiry.id,
+                == inquiry.id
             )
             .limit(1)
         )
 
-        if (
-            existing_reservation
-            is not None
-        ):
+        if existing_reservation is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "This inquiry is already linked "
-                    "to a reservation."
+                    "This inquiry is already "
+                    "linked to a reservation."
                 ),
             )
 
@@ -433,15 +562,12 @@ def convert_inquiry_to_reservation(
                 ),
             )
 
-        if (
-            inquiry.guest_count
-            is None
-        ):
+        if inquiry.guest_count is None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "Inquiry must have a guest count "
-                    "before conversion."
+                    "Inquiry must have a guest "
+                    "count before conversion."
                 ),
             )
 
@@ -466,9 +592,7 @@ def convert_inquiry_to_reservation(
                 == data.room_id,
                 Room.cottage_id
                 == data.cottage_id,
-                Room.is_active.is_(
-                    True,
-                ),
+                Room.is_active.is_(True),
             )
             .with_for_update()
         )
@@ -477,79 +601,60 @@ def convert_inquiry_to_reservation(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=(
-                    "Room not found for this cottage."
+                    "Room not found for "
+                    "this cottage."
                 ),
             )
 
-        if (
-            room.status
-            != "available"
-        ):
+        if room.status != "available":
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "This room is currently unavailable."
+                    "This room is currently "
+                    "unavailable."
                 ),
             )
 
-        conflicting_reservation = (
-            db.scalar(
-                select(
-                    Reservation.id,
-                )
-                .where(
-                    Reservation.room_id
-                    == room.id,
-
-                    Reservation.status.in_(
-                        BLOCKING_RESERVATION_STATUSES,
-                    ),
-
-                    Reservation.check_in
-                    < inquiry.check_out,
-
-                    Reservation.check_out
-                    > inquiry.check_in,
-                )
-                .limit(1)
+        conflict = db.scalar(
+            select(
+                Reservation.id
             )
+            .where(
+                Reservation.room_id
+                == room.id,
+                Reservation.status.in_(
+                    BLOCKING_RESERVATION_STATUSES
+                ),
+                Reservation.check_in
+                < inquiry.check_out,
+                Reservation.check_out
+                > inquiry.check_in,
+            )
+            .limit(1)
         )
 
-        if (
-            conflicting_reservation
-            is not None
-        ):
+        if conflict is not None:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
-                    "This room is no longer available "
-                    "for the inquiry dates."
+                    "This room is no longer "
+                    "available for the inquiry "
+                    "dates."
                 ),
             )
 
         reservation = Reservation(
             reference=generate_reference(),
-
             guest_id=guest.id,
             cottage_id=cottage.id,
             room_id=room.id,
-
             inquiry_id=inquiry.id,
-
             source=inquiry.source,
             status="pending",
-
             check_in=inquiry.check_in,
             check_out=inquiry.check_out,
-
-            guest_count=(
-                inquiry.guest_count
-            ),
-
-            total_amount=Decimal(
-                "0.00",
-            ),
-
+            guest_count=inquiry.guest_count,
+            total_amount=Decimal("0.00"),
             notes=(
                 data.notes.strip()
                 if (
@@ -558,52 +663,30 @@ def convert_inquiry_to_reservation(
                 )
                 else inquiry.message
             ),
-
             created_at=utc_now(),
         )
 
-        db.add(
-            reservation,
-        )
+        db.add(reservation)
         db.flush()
 
-        inquiry.status = (
-            "converted"
-        )
+        inquiry.status = "converted"
 
         response = (
             OperatorInquiryConversionResponse(
                 inquiry_id=inquiry.id,
-
-                inquiry_status=(
-                    inquiry.status
-                ),
-
-                reservation_id=(
-                    reservation.id
-                ),
-
+                inquiry_status=inquiry.status,
+                reservation_id=reservation.id,
                 reservation_reference=(
                     reservation.reference
                 ),
-
                 reservation_status=(
                     reservation.status
                 ),
-
                 guest_id=guest.id,
-
                 cottage_id=cottage.id,
                 room_id=room.id,
-
-                check_in=(
-                    reservation.check_in
-                ),
-
-                check_out=(
-                    reservation.check_out
-                ),
-
+                check_in=reservation.check_in,
+                check_out=reservation.check_out,
                 guest_count=(
                     reservation.guest_count
                 ),

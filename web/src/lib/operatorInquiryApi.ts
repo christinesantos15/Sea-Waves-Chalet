@@ -70,6 +70,31 @@ export type OperatorInquiryCreate = {
 };
 
 
+export type OperatorInquiryUpdate = {
+  full_name?: string;
+
+  phone?: string | null;
+  email?: string | null;
+
+  facebook_name?: string | null;
+  messenger_psid?: string | null;
+
+  check_in?: string | null;
+  check_out?: string | null;
+
+  guest_count?: number | null;
+
+  message?: string | null;
+};
+
+
+export type OperatorInquiryFilters = {
+  q?: string;
+  status?: InquiryStatus;
+  source?: InquirySource;
+};
+
+
 export type OperatorInquiryConversion = {
   inquiry_id: number;
   inquiry_status: InquiryStatus;
@@ -142,11 +167,46 @@ async function readError(
 }
 
 
-export async function getOperatorInquiries(): Promise<
-  OperatorInquiry[]
-> {
+export async function getOperatorInquiries(
+  filters: OperatorInquiryFilters = {},
+): Promise<OperatorInquiry[]> {
+  const params =
+    new URLSearchParams();
+
+  const query =
+    filters.q?.trim();
+
+  if (query) {
+    params.set(
+      "q",
+      query,
+    );
+  }
+
+  if (filters.status) {
+    params.set(
+      "status",
+      filters.status,
+    );
+  }
+
+  if (filters.source) {
+    params.set(
+      "source",
+      filters.source,
+    );
+  }
+
+  const queryString =
+    params.toString();
+
+  const url =
+    queryString
+      ? `${API_BASE_URL}/operator/inquiries?${queryString}`
+      : `${API_BASE_URL}/operator/inquiries`;
+
   const response = await fetch(
-    `${API_BASE_URL}/operator/inquiries`,
+    url,
     {
       method: "GET",
       credentials: "include",
@@ -173,6 +233,35 @@ export async function createOperatorInquiry(
     `${API_BASE_URL}/operator/inquiries`,
     {
       method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorInquiry
+  >;
+}
+
+
+export async function updateOperatorInquiry(
+  inquiryId: number,
+  data: OperatorInquiryUpdate,
+): Promise<OperatorInquiry> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/inquiries/${inquiryId}`,
+    {
+      method: "PATCH",
       credentials: "include",
       headers: {
         "Content-Type":

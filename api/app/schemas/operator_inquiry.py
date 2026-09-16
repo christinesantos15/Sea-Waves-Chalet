@@ -1,14 +1,7 @@
-from datetime import (
-    date,
-    datetime,
-)
+from datetime import date, datetime
 from typing import Literal
 
-from pydantic import (
-    BaseModel,
-    Field,
-    model_validator,
-)
+from pydantic import BaseModel, Field, model_validator
 
 
 InquirySource = Literal[
@@ -20,7 +13,6 @@ InquirySource = Literal[
     "manual",
 ]
 
-
 InquiryStatus = Literal[
     "new",
     "contacted",
@@ -29,7 +21,6 @@ InquiryStatus = Literal[
     "declined",
     "closed",
 ]
-
 
 OperatorEditableInquiryStatus = Literal[
     "new",
@@ -83,14 +74,50 @@ class OperatorInquiryCreate(BaseModel):
         if (
             self.check_in is not None
             and self.check_out is not None
-            and self.check_out
-            <= self.check_in
+            and self.check_out <= self.check_in
         ):
             raise ValueError(
                 "Check-out must be after check-in."
             )
 
         return self
+
+
+class OperatorInquiryUpdate(BaseModel):
+    full_name: str | None = Field(
+        default=None,
+        max_length=150,
+    )
+
+    phone: str | None = Field(
+        default=None,
+        max_length=50,
+    )
+
+    email: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+
+    facebook_name: str | None = Field(
+        default=None,
+        max_length=150,
+    )
+
+    messenger_psid: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+
+    check_in: date | None = None
+    check_out: date | None = None
+
+    guest_count: int | None = Field(
+        default=None,
+        ge=1,
+    )
+
+    message: str | None = None
 
 
 class OperatorInquiryStatusUpdate(BaseModel):
@@ -100,7 +127,6 @@ class OperatorInquiryStatusUpdate(BaseModel):
 class OperatorInquiryConvertRequest(BaseModel):
     cottage_id: int
     room_id: int
-
     notes: str | None = None
 
 
