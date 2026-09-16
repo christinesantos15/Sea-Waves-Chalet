@@ -110,3 +110,21 @@ class OperatorGuestDetail(
     reservations: list[
         OperatorGuestReservationHistory
     ]
+
+
+class OperatorGuestDuplicateMatch(
+    BaseModel
+):
+    field: str
+    value: str
+
+
+class OperatorGuestDuplicateCandidate(
+    BaseModel
+):
+    guest_a: OperatorGuestListItem
+    guest_b: OperatorGuestListItem
+
+    matches: list[
+        OperatorGuestDuplicateMatch
+    ]

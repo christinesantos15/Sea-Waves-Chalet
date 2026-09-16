@@ -217,3 +217,41 @@ export async function updateOperatorGuest(
     OperatorGuestDetail
   >;
 }
+
+
+export type OperatorGuestDuplicateMatch = {
+  field: string;
+  value: string;
+};
+
+
+export type OperatorGuestDuplicateCandidate = {
+  guest_a: OperatorGuest;
+  guest_b: OperatorGuest;
+
+  matches: OperatorGuestDuplicateMatch[];
+};
+
+
+export async function getOperatorGuestDuplicates(): Promise<
+  OperatorGuestDuplicateCandidate[]
+> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/guests/duplicates`,
+    {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorGuestDuplicateCandidate[]
+  >;
+}

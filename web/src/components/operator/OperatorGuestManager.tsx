@@ -7,6 +7,8 @@ import {
   useState,
 } from "react";
 
+import OperatorGuestDuplicatePanel from "@/components/operator/OperatorGuestDuplicatePanel";
+
 import {
   type OperatorGuest,
   type OperatorGuestDetail,
@@ -578,6 +580,15 @@ export default function OperatorGuestManager() {
           </div>
         )}
       </div>
+
+
+      <OperatorGuestDuplicatePanel
+        onSelectGuest={(guestId) =>
+          void openGuest(
+            guestId,
+          )
+        }
+      />
 
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.6fr)]">
