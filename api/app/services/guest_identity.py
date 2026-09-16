@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models import Guest
@@ -173,6 +173,88 @@ def compare_guest_identity(
             )
 
     return matches
+
+
+def guest_identity_lock_keys(
+    *,
+    phone: str | None = None,
+    email: str | None = None,
+    messenger_psid: str | None = None,
+) -> list[str]:
+    incoming_phone = (
+        normalize_phone(
+            phone
+        )
+    )
+
+    incoming_email = (
+        normalize_email(
+            email
+        )
+    )
+
+    incoming_psid = (
+        normalize_psid(
+            messenger_psid
+        )
+    )
+
+    lock_keys: set[str] = set()
+
+    if incoming_psid:
+        lock_keys.add(
+            "guest:psid:"
+            + incoming_psid
+        )
+
+    if (
+        incoming_phone
+        and incoming_email
+    ):
+        lock_keys.add(
+            "guest:phone-email:"
+            + incoming_phone
+            + "|"
+            + incoming_email
+        )
+
+    return sorted(
+        lock_keys
+    )
+
+
+def acquire_guest_identity_locks(
+    db: Session,
+    *,
+    phone: str | None = None,
+    email: str | None = None,
+    messenger_psid: str | None = None,
+) -> None:
+    lock_keys = (
+        guest_identity_lock_keys(
+            phone=phone,
+            email=email,
+            messenger_psid=(
+                messenger_psid
+            ),
+        )
+    )
+
+    for lock_key in lock_keys:
+        db.execute(
+            text(
+                "SELECT "
+                "pg_advisory_xact_lock("
+                "hashtextextended("
+                ":lock_key, 0"
+                ")"
+                ")"
+            ),
+            {
+                "lock_key":
+                    lock_key,
+            },
+        )
 
 
 def find_reusable_guest(
@@ -364,6 +446,15 @@ def get_or_create_guest(
     messenger_psid: str | None = None,
     creation_note: str,
 ) -> tuple[Guest, bool]:
+    acquire_guest_identity_locks(
+        db,
+        phone=phone,
+        email=email,
+        messenger_psid=(
+            messenger_psid
+        ),
+    )
+
     reusable_guest = (
         find_reusable_guest(
             db,
