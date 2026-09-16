@@ -10,6 +10,19 @@ export type RoomDetail = {
   is_active: boolean;
 };
 
+export type CottageMedia = {
+  id: number;
+  cottage_id: number;
+  media_type: "image" | "video";
+  url: string;
+  alt_text: string | null;
+  caption: string | null;
+  sort_order: number;
+  is_cover: boolean;
+  is_active: boolean;
+};
+
+
 export type CottageDetail = {
   id: number;
   code: string;
@@ -22,6 +35,7 @@ export type CottageDetail = {
   map_x: string | number | null;
   map_y: string | number | null;
   rooms: RoomDetail[];
+  media: CottageMedia[];
 };
 
 export type RoomAvailability = {
