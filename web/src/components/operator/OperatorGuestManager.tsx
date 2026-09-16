@@ -588,6 +588,12 @@ export default function OperatorGuestManager() {
             guestId,
           )
         }
+        onMergeComplete={(guestId) => {
+          void loadGuests();
+          void openGuest(
+            guestId,
+          );
+        }}
       />
 
 

@@ -128,3 +128,25 @@ class OperatorGuestDuplicateCandidate(
     matches: list[
         OperatorGuestDuplicateMatch
     ]
+
+
+class OperatorGuestMergeRequest(
+    BaseModel
+):
+    canonical_guest_id: int = Field(
+        gt=0
+    )
+    duplicate_guest_id: int = Field(
+        gt=0
+    )
+
+
+class OperatorGuestMergeResponse(
+    BaseModel
+):
+    canonical_guest: OperatorGuestDetail
+
+    merged_guest_id: int
+
+    moved_inquiries: int
+    moved_reservations: int
