@@ -37,12 +37,32 @@ class Reservation(Base):
         ForeignKey("guests.id"),
     )
 
-    cottage_id: Mapped[int] = mapped_column(
+    cottage_id: Mapped[int | None] = mapped_column(
         ForeignKey("cottages.id"),
+        nullable=True,
     )
 
     room_id: Mapped[int | None] = mapped_column(
         ForeignKey("rooms.id"),
+        nullable=True,
+    )
+
+    room_type_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "room_types.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    rate_plan: Mapped[str | None] = mapped_column(
+        String(30),
+        nullable=True,
+    )
+
+    quoted_rate: Mapped[Decimal | None] = mapped_column(
+        Numeric(10, 2),
         nullable=True,
     )
 

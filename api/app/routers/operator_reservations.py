@@ -14,8 +14,10 @@ from app.models import (
     Guest,
     Reservation,
     Room,
+    RoomType,
 )
 from app.schemas.reservation import (
+    OperatorReservationAssignment,
     OperatorReservationDecision,
     OperatorReservationResponse,
 )
@@ -67,8 +69,9 @@ BLOCKING_RESERVATION_STATUSES = (
 def build_operator_response(
     reservation: Reservation,
     guest: Guest,
-    cottage: Cottage,
+    cottage: Cottage | None,
     room: Room | None,
+    room_type: RoomType | None,
 ) -> OperatorReservationResponse:
     return OperatorReservationResponse(
         id=reservation.id,
@@ -77,9 +80,21 @@ def build_operator_response(
         guest_name=guest.full_name,
         guest_phone=guest.phone,
         guest_email=guest.email,
-        cottage_id=cottage.id,
-        cottage_code=cottage.code,
-        cottage_name=cottage.name,
+        cottage_id=(
+            cottage.id
+            if cottage is not None
+            else None
+        ),
+        cottage_code=(
+            cottage.code
+            if cottage is not None
+            else None
+        ),
+        cottage_name=(
+            cottage.name
+            if cottage is not None
+            else None
+        ),
         room_id=(
             room.id
             if room is not None
@@ -93,6 +108,23 @@ def build_operator_response(
         room_name=(
             room.name
             if room is not None
+            else None
+        ),
+        room_type_id=(
+            room_type.id
+            if room_type is not None
+            else None
+        ),
+        room_type_name=(
+            room_type.name
+            if room_type is not None
+            else None
+        ),
+        rate_plan=reservation.rate_plan,
+        quoted_rate=(
+            str(reservation.quoted_rate)
+            if reservation.quoted_rate
+            is not None
             else None
         ),
         source=reservation.source,
@@ -118,12 +150,13 @@ def get_operator_reservation_response(
             Guest,
             Cottage,
             Room,
+            RoomType,
         )
         .join(
             Guest,
             Guest.id == Reservation.guest_id,
         )
-        .join(
+        .outerjoin(
             Cottage,
             Cottage.id
             == Reservation.cottage_id,
@@ -131,6 +164,11 @@ def get_operator_reservation_response(
         .outerjoin(
             Room,
             Room.id == Reservation.room_id,
+        )
+        .outerjoin(
+            RoomType,
+            RoomType.id
+            == Reservation.room_type_id,
         )
         .where(
             Reservation.id
@@ -153,6 +191,7 @@ def get_operator_reservation_response(
         guest,
         cottage,
         room,
+        room_type,
     ) = row
 
     return build_operator_response(
@@ -160,6 +199,7 @@ def get_operator_reservation_response(
         guest,
         cottage,
         room,
+        room_type,
     )
 
 
@@ -191,12 +231,13 @@ def get_operator_reservations(
             Guest,
             Cottage,
             Room,
+            RoomType,
         )
         .join(
             Guest,
             Guest.id == Reservation.guest_id,
         )
-        .join(
+        .outerjoin(
             Cottage,
             Cottage.id
             == Reservation.cottage_id,
@@ -204,6 +245,11 @@ def get_operator_reservations(
         .outerjoin(
             Room,
             Room.id == Reservation.room_id,
+        )
+        .outerjoin(
+            RoomType,
+            RoomType.id
+            == Reservation.room_type_id,
         )
         .where(
             Reservation.status
@@ -225,12 +271,14 @@ def get_operator_reservations(
             guest,
             cottage,
             room,
+            room_type,
         )
         for (
             reservation,
             guest,
             cottage,
             room,
+            room_type,
         ) in rows
     ]
 
@@ -292,6 +340,28 @@ def decide_pending_reservation(
                 detail=(
                     "Only pending reservations "
                     "can be reviewed."
+                ),
+            )
+
+        if (
+            decision.status == "confirmed"
+            and reservation.room_type_id
+            is not None
+            and (
+                reservation.cottage_id
+                is None
+                or reservation.room_id
+                is None
+            )
+        ):
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "Assign a physical cottage "
+                    "and room before confirming "
+                    "this reservation."
                 ),
             )
 
@@ -436,6 +506,169 @@ def check_out_reservation(
             db,
             reservation,
         )
+
+        db.commit()
+
+        return get_operator_reservation_response(
+            db,
+            reservation.id,
+        )
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except Exception:
+        db.rollback()
+        raise
+
+@router.patch(
+    "/{reservation_id}/assignment",
+    response_model=OperatorReservationResponse,
+)
+def assign_reservation_room(
+    reservation_id: int,
+    assignment: OperatorReservationAssignment,
+    db: Session = Depends(get_db),
+) -> OperatorReservationResponse:
+    try:
+        reservation = db.scalar(
+            select(Reservation)
+            .where(
+                Reservation.id
+                == reservation_id,
+            )
+            .with_for_update()
+        )
+
+        if reservation is None:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                ),
+                detail="Reservation not found.",
+            )
+
+        if reservation.status != "pending":
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "Only pending reservations "
+                    "can be assigned."
+                ),
+            )
+
+        if reservation.room_type_id is None:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "This reservation does not "
+                    "have a requested room type."
+                ),
+            )
+
+        cottage = db.get(
+            Cottage,
+            assignment.cottage_id,
+        )
+
+        if (
+            cottage is None
+            or not cottage.is_active
+        ):
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                ),
+                detail="Cottage not found.",
+            )
+
+        room = db.scalar(
+            select(Room)
+            .where(
+                Room.id
+                == assignment.room_id,
+                Room.cottage_id
+                == assignment.cottage_id,
+                Room.is_active.is_(True),
+            )
+            .with_for_update()
+        )
+
+        if room is None:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                ),
+                detail=(
+                    "Room not found for this cottage."
+                ),
+            )
+
+        if room.status != "available":
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "This room is currently "
+                    "unavailable."
+                ),
+            )
+
+        if (
+            room.room_type_id
+            != reservation.room_type_id
+        ):
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "The selected physical room "
+                    "does not match the requested "
+                    "room type."
+                ),
+            )
+
+        conflict = db.scalar(
+            select(Reservation.id)
+            .where(
+                Reservation.id
+                != reservation.id,
+                Reservation.room_id
+                == room.id,
+                Reservation.status.in_(
+                    BLOCKING_RESERVATION_STATUSES
+                ),
+                Reservation.check_in
+                < reservation.check_out,
+                Reservation.check_out
+                > reservation.check_in,
+            )
+            .limit(1)
+        )
+
+        if conflict is not None:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_409_CONFLICT
+                ),
+                detail=(
+                    "This room is already reserved "
+                    "for the selected dates."
+                ),
+            )
+
+        reservation.cottage_id = (
+            cottage.id
+        )
+
+        reservation.room_id = room.id
 
         db.commit()
 
