@@ -27,6 +27,10 @@ from app.models import (
     Room,
 )
 
+from app.services.guest_identity import (
+    get_or_create_guest,
+)
+
 from app.schemas.operator_inquiry import (
     InquirySource,
     InquiryStatus,
@@ -244,27 +248,24 @@ def create_inquiry(
         )
 
     try:
-        guest = Guest(
-            full_name=full_name,
-            phone=clean_optional(
-                data.phone
-            ),
-            email=clean_optional(
-                data.email
-            ),
-            facebook_name=clean_optional(
-                data.facebook_name
-            ),
-            messenger_psid=clean_optional(
-                data.messenger_psid
-            ),
-            notes=(
-                "Created from resort inquiry."
-            ),
+        guest, _guest_created = (
+            get_or_create_guest(
+                db,
+                full_name=full_name,
+                phone=data.phone,
+                email=data.email,
+                facebook_name=(
+                    data.facebook_name
+                ),
+                messenger_psid=(
+                    data.messenger_psid
+                ),
+                creation_note=(
+                    "Created from resort "
+                    "inquiry."
+                ),
+            )
         )
-
-        db.add(guest)
-        db.flush()
 
         inquiry = Inquiry(
             guest_id=guest.id,

@@ -14,13 +14,16 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Cottage,
-    Guest,
     Reservation,
     Room,
 )
 from app.schemas.reservation import (
     CustomerReservationCreate,
     CustomerReservationResponse,
+)
+
+from app.services.guest_identity import (
+    get_or_create_guest,
 )
 
 
@@ -108,23 +111,20 @@ def create_customer_reservation(
                 ),
             )
 
-        guest = Guest(
-            full_name=data.full_name.strip(),
-            phone=(
-                data.phone.strip()
-                if data.phone
-                else None
-            ),
-            email=(
-                data.email.strip()
-                if data.email
-                else None
-            ),
-            notes="Created from website reservation request.",
+        guest, _guest_created = (
+            get_or_create_guest(
+                db,
+                full_name=(
+                    data.full_name
+                ),
+                phone=data.phone,
+                email=data.email,
+                creation_note=(
+                    "Created from website "
+                    "reservation request."
+                ),
+            )
         )
-
-        db.add(guest)
-        db.flush()
 
         reservation = Reservation(
             reference=generate_reference(),
