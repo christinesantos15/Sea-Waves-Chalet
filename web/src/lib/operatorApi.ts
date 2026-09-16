@@ -15,13 +15,21 @@ export type OperatorReservation = {
   guest_phone: string | null;
   guest_email: string | null;
 
-  cottage_id: number;
-  cottage_code: string;
-  cottage_name: string;
+  cottage_id: number | null;
+  cottage_code: string | null;
+  cottage_name: string | null;
 
   room_id: number | null;
   room_code: string | null;
   room_name: string | null;
+
+  room_type_id: number | null;
+  room_type_name: string | null;
+  rate_plan:
+    | "with_breakfast"
+    | "without_breakfast"
+    | null;
+  quoted_rate: string | null;
 
   source: string;
   status: OperatorReservationStatus;
@@ -192,6 +200,38 @@ export async function decideReservation(
     OperatorReservation
   >;
 }
+
+export async function assignReservationRoom(
+  reservationId: number,
+  cottageId: number,
+  roomId: number,
+): Promise<OperatorReservation> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/reservations/${reservationId}/assignment`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cottage_id: cottageId,
+        room_id: roomId,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorReservation
+  >;
+}
+
 
 export async function checkInReservation(
   reservationId: number,

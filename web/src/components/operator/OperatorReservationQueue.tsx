@@ -9,6 +9,7 @@ import {
 import OperatorPaymentPanel from "@/components/operator/OperatorPaymentPanel";
 
 import {
+  assignReservationRoom,
   checkInReservation,
   checkOutReservation,
   decideReservation,
@@ -16,6 +17,11 @@ import {
   type OperatorReservation,
   type OperatorReservationStatus,
 } from "@/lib/operatorApi";
+
+import {
+  getOperatorCottages,
+  type OperatorCottage,
+} from "@/lib/operatorCottageApi";
 
 type QueueStatus =
   | "pending"
@@ -136,6 +142,27 @@ export default function OperatorReservationQueue() {
     null,
   );
 
+  const [
+    cottages,
+    setCottages,
+  ] = useState<
+    OperatorCottage[]
+  >([]);
+
+  const [
+    assignmentCottageIds,
+    setAssignmentCottageIds,
+  ] = useState<
+    Record<number, string>
+  >({});
+
+  const [
+    assignmentRoomIds,
+    setAssignmentRoomIds,
+  ] = useState<
+    Record<number, string>
+  >({});
+
   const loadDashboard =
     useCallback(async () => {
       try {
@@ -148,6 +175,7 @@ export default function OperatorReservationQueue() {
           checkedIn,
           checkedOut,
           declined,
+          inventory,
         ] = await Promise.all([
           getOperatorReservations(
             "pending",
@@ -164,7 +192,10 @@ export default function OperatorReservationQueue() {
           getOperatorReservations(
             "declined",
           ),
+          getOperatorCottages(),
         ]);
+
+        setCottages(inventory);
 
         setCounts({
           pending:
@@ -260,6 +291,101 @@ export default function OperatorReservationQueue() {
       );
     }
   }
+
+  async function handleAssignment(
+    reservation:
+      OperatorReservation,
+  ) {
+    const cottageValue =
+      assignmentCottageIds[
+        reservation.id
+      ] ?? "";
+
+    const roomValue =
+      assignmentRoomIds[
+        reservation.id
+      ] ?? "";
+
+    const cottageId =
+      Number(cottageValue);
+
+    const roomId =
+      Number(roomValue);
+
+    if (
+      !Number.isInteger(cottageId) ||
+      cottageId <= 0 ||
+      !Number.isInteger(roomId) ||
+      roomId <= 0
+    ) {
+      setError(
+        "Choose a cottage and room before assigning.",
+      );
+
+      return;
+    }
+
+    try {
+      setActionReservationId(
+        reservation.id,
+      );
+
+      setError(null);
+
+      await assignReservationRoom(
+        reservation.id,
+        cottageId,
+        roomId,
+      );
+
+      setAssignmentCottageIds(
+        (current) => {
+          const next = {
+            ...current,
+          };
+
+          delete next[
+            reservation.id
+          ];
+
+          return next;
+        },
+      );
+
+      setAssignmentRoomIds(
+        (current) => {
+          const next = {
+            ...current,
+          };
+
+          delete next[
+            reservation.id
+          ];
+
+          return next;
+        },
+      );
+
+      await loadDashboard();
+    } catch (error) {
+      if (
+        error instanceof Error
+      ) {
+        setError(
+          error.message,
+        );
+      } else {
+        setError(
+          "Could not assign physical room.",
+        );
+      }
+    } finally {
+      setActionReservationId(
+        null,
+      );
+    }
+  }
+
 
   async function handleCheckIn(
     reservation:
@@ -550,6 +676,57 @@ export default function OperatorReservationQueue() {
                     actionReservationId ===
                     reservation.id;
 
+                  const isRoomTypeRequest =
+                    reservation.room_type_id !==
+                    null;
+
+                  const needsAssignment =
+                    isRoomTypeRequest &&
+                    (
+                      reservation.cottage_id ===
+                        null ||
+                      reservation.room_id ===
+                        null
+                    );
+
+                  const compatibleCottages =
+                    isRoomTypeRequest
+                      ? cottages.filter(
+                          (cottage) =>
+                            cottage.is_active &&
+                            cottage.rooms.some(
+                              (room) =>
+                                room.is_active &&
+                                room.room_type_id ===
+                                  reservation.room_type_id,
+                            ),
+                        )
+                      : [];
+
+                  const selectedCottageId =
+                    Number(
+                      assignmentCottageIds[
+                        reservation.id
+                      ] ?? "",
+                    );
+
+                  const selectedCottage =
+                    cottages.find(
+                      (cottage) =>
+                        cottage.id ===
+                        selectedCottageId,
+                    );
+
+                  const compatibleRooms =
+                    selectedCottage
+                      ? selectedCottage.rooms.filter(
+                          (room) =>
+                            room.is_active &&
+                            room.room_type_id ===
+                              reservation.room_type_id,
+                        )
+                      : [];
+
                   return (
                     <article
                       key={
@@ -606,14 +783,23 @@ export default function OperatorReservationQueue() {
                           </p>
 
                           <p className="mt-1 text-sm font-semibold text-slate-900">
-                            {
-                              reservation.cottage_name
-                            }
+                            {reservation.room_type_id !==
+                            null
+                              ? reservation.room_type_name ??
+                                "Room type request"
+                              : reservation.cottage_name ??
+                                "Not assigned"}
                           </p>
 
                           <p className="text-xs text-slate-500">
-                            {reservation.room_name ??
-                              "Whole cottage"}
+                            {reservation.room_type_id !==
+                            null
+                              ? reservation.cottage_name &&
+                                reservation.room_name
+                                ? `${reservation.cottage_name} · ${reservation.room_name}`
+                                : "Physical room not assigned yet"
+                              : reservation.room_name ??
+                                "Whole cottage"}
                           </p>
                         </div>
 
@@ -667,6 +853,67 @@ export default function OperatorReservationQueue() {
                         </div>
                       </div>
 
+                      {reservation.room_type_id !==
+                        null && (
+                        <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50/60 p-5">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+                            Requested accommodation
+                          </p>
+
+                          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                            <div>
+                              <p className="text-xs text-slate-500">
+                                Room type
+                              </p>
+
+                              <p className="mt-1 text-sm font-semibold text-slate-900">
+                                {reservation.room_type_name ??
+                                  "Unknown room type"}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-slate-500">
+                                Rate plan
+                              </p>
+
+                              <p className="mt-1 text-sm font-semibold text-slate-900">
+                                {reservation.rate_plan ===
+                                "with_breakfast"
+                                  ? "With breakfast"
+                                  : reservation.rate_plan ===
+                                      "without_breakfast"
+                                    ? "Without breakfast"
+                                    : "Not set"}
+                              </p>
+                            </div>
+
+                            <div>
+                              <p className="text-xs text-slate-500">
+                                Quoted nightly rate
+                              </p>
+
+                              <p className="mt-1 text-sm font-semibold text-slate-900">
+                                {reservation.quoted_rate !==
+                                null
+                                  ? `₱${Number(
+                                      reservation.quoted_rate,
+                                    ).toLocaleString(
+                                      "en-PH",
+                                    )}`
+                                  : "Not set"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <p className="mt-4 text-xs text-slate-500">
+                            This displays the rate
+                            captured when the guest
+                            submitted the request.
+                          </p>
+                        </div>
+                      )}
+
                       <div className="mt-5 grid gap-4 sm:grid-cols-2">
                         <div>
                           <p className="text-xs uppercase tracking-wide text-slate-400">
@@ -706,12 +953,207 @@ export default function OperatorReservationQueue() {
                       )}
 
                       {reservation.status ===
+                        "pending" &&
+                        needsAssignment && (
+                        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+                              Physical assignment required
+                            </p>
+
+                            <p className="mt-2 text-sm text-amber-900">
+                              Assign a physical room
+                              that matches the requested
+                              room type before confirming
+                              this reservation.
+                            </p>
+                          </div>
+
+                          {compatibleCottages.length ===
+                          0 ? (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-white p-4">
+                              <p className="text-sm font-medium text-slate-800">
+                                No matching physical rooms
+                                are mapped yet.
+                              </p>
+
+                              <p className="mt-1 text-xs leading-5 text-slate-500">
+                                Assign this room type to
+                                a physical room under
+                                Cottages first.
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+                              <label className="block">
+                                <span className="text-xs font-medium text-slate-600">
+                                  Cottage
+                                </span>
+
+                                <select
+                                  value={
+                                    assignmentCottageIds[
+                                      reservation.id
+                                    ] ?? ""
+                                  }
+                                  onChange={(event) => {
+                                    const value =
+                                      event.target.value;
+
+                                    setAssignmentCottageIds(
+                                      (current) => ({
+                                        ...current,
+                                        [reservation.id]:
+                                          value,
+                                      }),
+                                    );
+
+                                    setAssignmentRoomIds(
+                                      (current) => ({
+                                        ...current,
+                                        [reservation.id]:
+                                          "",
+                                      }),
+                                    );
+                                  }}
+                                  disabled={
+                                    actionPending
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500"
+                                >
+                                  <option value="">
+                                    Select cottage
+                                  </option>
+
+                                  {compatibleCottages.map(
+                                    (cottage) => (
+                                      <option
+                                        key={
+                                          cottage.id
+                                        }
+                                        value={
+                                          cottage.id
+                                        }
+                                      >
+                                        {
+                                          cottage.code
+                                        }{" "}
+                                        ·{" "}
+                                        {
+                                          cottage.name
+                                        }
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </label>
+
+                              <label className="block">
+                                <span className="text-xs font-medium text-slate-600">
+                                  Room
+                                </span>
+
+                                <select
+                                  value={
+                                    assignmentRoomIds[
+                                      reservation.id
+                                    ] ?? ""
+                                  }
+                                  onChange={(event) =>
+                                    setAssignmentRoomIds(
+                                      (current) => ({
+                                        ...current,
+                                        [reservation.id]:
+                                          event.target
+                                            .value,
+                                      }),
+                                    )
+                                  }
+                                  disabled={
+                                    actionPending ||
+                                    !selectedCottage
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 disabled:bg-slate-100"
+                                >
+                                  <option value="">
+                                    Select room
+                                  </option>
+
+                                  {compatibleRooms.map(
+                                    (room) => (
+                                      <option
+                                        key={
+                                          room.id
+                                        }
+                                        value={
+                                          room.id
+                                        }
+                                      >
+                                        {
+                                          room.code
+                                        }{" "}
+                                        ·{" "}
+                                        {
+                                          room.name
+                                        }
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                              </label>
+
+                              <button
+                                type="button"
+                                disabled={
+                                  actionPending ||
+                                  !assignmentCottageIds[
+                                    reservation.id
+                                  ] ||
+                                  !assignmentRoomIds[
+                                    reservation.id
+                                  ]
+                                }
+                                onClick={() =>
+                                  void handleAssignment(
+                                    reservation,
+                                  )
+                                }
+                                className="rounded-xl bg-sky-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {actionPending
+                                  ? "Assigning..."
+                                  : "Assign room"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {reservation.status ===
+                        "pending" &&
+                        isRoomTypeRequest &&
+                        !needsAssignment && (
+                        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                          <p className="text-sm font-semibold text-emerald-800">
+                            Physical room assigned
+                          </p>
+
+                          <p className="mt-1 text-sm text-emerald-700">
+                            {reservation.cottage_code} ·{" "}
+                            {reservation.room_code} —{" "}
+                            {reservation.room_name}
+                          </p>
+                        </div>
+                      )}
+
+                      {reservation.status ===
                         "pending" && (
                         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                           <button
                             type="button"
                             disabled={
-                              actionPending
+                              actionPending ||
+                              needsAssignment
                             }
                             onClick={() =>
                               void handleDecision(

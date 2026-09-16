@@ -271,6 +271,7 @@ def get_operator_reservations(
             guest,
             cottage,
             room,
+            room_type,
         )
         for (
             reservation,
