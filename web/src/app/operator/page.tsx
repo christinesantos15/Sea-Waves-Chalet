@@ -44,6 +44,13 @@ export default function OperatorPage() {
               >
                 Open inquiry inbox
               </Link>
+
+              <Link
+                href="/operator/guests"
+                className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Open guest directory
+              </Link>
             </div>
           </header>
 
