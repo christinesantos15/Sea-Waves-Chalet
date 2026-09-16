@@ -23,6 +23,8 @@ from app.models import (
 )
 from app.schemas.operator_guest import (
     OperatorGuestDetail,
+    OperatorGuestDuplicateCandidate,
+    OperatorGuestDuplicateMatch,
     OperatorGuestInquiryHistory,
     OperatorGuestListItem,
     OperatorGuestReservationHistory,
@@ -312,6 +314,130 @@ def list_guests(
             reservation_total,
         ) in rows
     ]
+
+
+@router.get(
+    "/duplicates",
+    response_model=list[
+        OperatorGuestDuplicateCandidate
+    ],
+)
+def list_duplicate_guests(
+    db: Session = Depends(
+        get_db
+    ),
+):
+    from app.services.guest_identity import (
+        compare_guest_identity,
+    )
+
+    guests = list(
+        db.scalars(
+            select(Guest).order_by(
+                Guest.id.asc()
+            )
+        ).all()
+    )
+
+    inquiry_counts = dict(
+        db.execute(
+            select(
+                Inquiry.guest_id,
+                func.count(
+                    Inquiry.id
+                ),
+            )
+            .group_by(
+                Inquiry.guest_id
+            )
+        ).all()
+    )
+
+    reservation_counts = dict(
+        db.execute(
+            select(
+                Reservation.guest_id,
+                func.count(
+                    Reservation.id
+                ),
+            )
+            .group_by(
+                Reservation.guest_id
+            )
+        ).all()
+    )
+
+    def guest_summary(
+        guest: Guest,
+    ) -> OperatorGuestListItem:
+        return OperatorGuestListItem(
+            id=guest.id,
+            full_name=(
+                guest.full_name
+            ),
+            phone=guest.phone,
+            email=guest.email,
+            facebook_name=(
+                guest.facebook_name
+            ),
+            messenger_psid=(
+                guest.messenger_psid
+            ),
+            notes=guest.notes,
+            inquiry_count=(
+                inquiry_counts.get(
+                    guest.id,
+                    0,
+                )
+            ),
+            reservation_count=(
+                reservation_counts.get(
+                    guest.id,
+                    0,
+                )
+            ),
+        )
+
+    candidates: list[
+        OperatorGuestDuplicateCandidate
+    ] = []
+
+    for index, first in enumerate(
+        guests
+    ):
+        for second in guests[
+            index + 1:
+        ]:
+            identity_matches = (
+                compare_guest_identity(
+                    first,
+                    second,
+                )
+            )
+
+            if not identity_matches:
+                continue
+
+            candidates.append(
+                OperatorGuestDuplicateCandidate(
+                    guest_a=guest_summary(
+                        first
+                    ),
+                    guest_b=guest_summary(
+                        second
+                    ),
+                    matches=[
+                        OperatorGuestDuplicateMatch(
+                            field=match.field,
+                            value=match.value,
+                        )
+                        for match
+                        in identity_matches
+                    ],
+                )
+            )
+
+    return candidates
 
 
 @router.get(
