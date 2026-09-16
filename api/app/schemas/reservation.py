@@ -138,6 +138,71 @@ class RoomTypeReservationResponse(BaseModel):
     message: str
 
 
+class ReservationStatusLookupRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+
+    reference: str = Field(
+        min_length=1,
+        max_length=50,
+    )
+
+    phone: str | None = Field(
+        default=None,
+        max_length=50,
+    )
+
+    email: str | None = Field(
+        default=None,
+        max_length=255,
+    )
+
+    @model_validator(mode="after")
+    def validate_contact(self):
+        phone = (
+            self.phone.strip()
+            if self.phone
+            else ""
+        )
+
+        email = (
+            self.email.strip()
+            if self.email
+            else ""
+        )
+
+        if not phone and not email:
+            raise ValueError(
+                "Provide either a phone number "
+                "or email address."
+            )
+
+        if not self.reference.strip():
+            raise ValueError(
+                "Reservation reference is required."
+            )
+
+        return self
+
+
+class ReservationStatusLookupResponse(BaseModel):
+    reference: str
+    status: str
+
+    check_in: date
+    check_out: date
+    guest_count: int
+
+    room_type_name: str | None
+    rate_plan: str | None
+    quoted_rate: Decimal | None
+    total_amount: Decimal
+
+    cottage_name: str | None
+    room_name: str | None
+
+
 class OperatorReservationResponse(BaseModel):
     id: int
     reference: str
