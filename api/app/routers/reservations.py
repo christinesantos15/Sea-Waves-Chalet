@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     Cottage,
+    Guest,
     Reservation,
     Room,
     RoomRate,
@@ -22,12 +23,16 @@ from app.models import (
 from app.schemas.reservation import (
     CustomerReservationCreate,
     CustomerReservationResponse,
+    ReservationStatusLookupRequest,
+    ReservationStatusLookupResponse,
     RoomTypeReservationCreate,
     RoomTypeReservationResponse,
 )
 
 from app.services.guest_identity import (
     get_or_create_guest,
+    normalize_email,
+    normalize_phone,
 )
 
 
@@ -45,6 +50,151 @@ BLOCKING_RESERVATION_STATUSES = (
 
 def generate_reference() -> str:
     return f"SW-{uuid4().hex[:12].upper()}"
+
+
+def reservation_lookup_not_found() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=(
+            "Reservation not found or contact "
+            "details do not match."
+        ),
+    )
+
+
+@router.post(
+    "/reservations/status-lookup",
+    response_model=ReservationStatusLookupResponse,
+)
+def lookup_reservation_status(
+    data: ReservationStatusLookupRequest,
+    db: Session = Depends(get_db),
+) -> ReservationStatusLookupResponse:
+    reference = (
+        data.reference
+        .strip()
+        .upper()
+    )
+
+    reservation = db.scalar(
+        select(Reservation)
+        .where(
+            Reservation.reference
+            == reference
+        )
+        .limit(1)
+    )
+
+    if reservation is None:
+        raise reservation_lookup_not_found()
+
+    guest = db.get(
+        Guest,
+        reservation.guest_id,
+    )
+
+    if guest is None:
+        raise reservation_lookup_not_found()
+
+    requested_phone = normalize_phone(
+        data.phone
+    )
+
+    requested_email = normalize_email(
+        data.email
+    )
+
+    stored_phone = normalize_phone(
+        guest.phone
+    )
+
+    stored_email = normalize_email(
+        guest.email
+    )
+
+    phone_matches = bool(
+        requested_phone
+        and stored_phone
+        and requested_phone
+        == stored_phone
+    )
+
+    email_matches = bool(
+        requested_email
+        and stored_email
+        and requested_email
+        == stored_email
+    )
+
+    if not (
+        phone_matches
+        or email_matches
+    ):
+        raise reservation_lookup_not_found()
+
+    room_type = (
+        db.get(
+            RoomType,
+            reservation.room_type_id,
+        )
+        if reservation.room_type_id
+        is not None
+        else None
+    )
+
+    cottage = (
+        db.get(
+            Cottage,
+            reservation.cottage_id,
+        )
+        if reservation.cottage_id
+        is not None
+        else None
+    )
+
+    room = (
+        db.get(
+            Room,
+            reservation.room_id,
+        )
+        if reservation.room_id
+        is not None
+        else None
+    )
+
+    return ReservationStatusLookupResponse(
+        reference=reservation.reference,
+        status=reservation.status,
+        check_in=reservation.check_in,
+        check_out=reservation.check_out,
+        guest_count=(
+            reservation.guest_count
+        ),
+        room_type_name=(
+            room_type.name
+            if room_type
+            else None
+        ),
+        rate_plan=(
+            reservation.rate_plan
+        ),
+        quoted_rate=(
+            reservation.quoted_rate
+        ),
+        total_amount=(
+            reservation.total_amount
+        ),
+        cottage_name=(
+            cottage.name
+            if cottage
+            else None
+        ),
+        room_name=(
+            room.name
+            if room
+            else None
+        ),
+    )
 
 
 @router.post(

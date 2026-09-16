@@ -282,3 +282,76 @@ export async function createRoomTypeReservationRequest(
 
   return body as RoomTypeReservationResponse;
 }
+
+export type ReservationStatusLookupRequest = {
+  reference: string;
+  phone: string | null;
+  email: string | null;
+};
+
+export type ReservationStatusLookupResponse = {
+  reference: string;
+  status: string;
+
+  check_in: string;
+  check_out: string;
+  guest_count: number;
+
+  room_type_name: string | null;
+  rate_plan: string | null;
+  quoted_rate: string | null;
+  total_amount: string;
+
+  cottage_name: string | null;
+  room_name: string | null;
+};
+
+export async function lookupReservationStatus(
+  data: ReservationStatusLookupRequest,
+): Promise<ReservationStatusLookupResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/reservations/status-lookup`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  const body = await response
+    .json()
+    .catch(() => null);
+
+  if (!response.ok) {
+    if (
+      body &&
+      typeof body.detail === "string"
+    ) {
+      throw new Error(
+        body.detail,
+      );
+    }
+
+    if (
+      body &&
+      Array.isArray(body.detail)
+    ) {
+      const firstError =
+        body.detail[0]?.msg;
+
+      throw new Error(
+        typeof firstError === "string"
+          ? firstError
+          : "The reservation lookup is invalid.",
+      );
+    }
+
+    throw new Error(
+      `Failed to check reservation: ${response.status}`,
+    );
+  }
+
+  return body as ReservationStatusLookupResponse;
+}

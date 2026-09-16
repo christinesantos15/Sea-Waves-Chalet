@@ -1,6 +1,7 @@
 import CustomerPropertyMap from "@/components/customer-map/CustomerPropertyMap";
 import PublicPricingSection from "@/components/public/PublicPricingSection";
 import RoomTypeBookingSection from "@/components/public/RoomTypeBookingSection";
+import ReservationStatusSection from "@/components/public/ReservationStatusSection";
 import { getPublicPricing } from "@/lib/publicPricingApi";
 import { getPropertyMapLocations } from "@/lib/resortApi";
 
@@ -151,6 +152,8 @@ export default async function Home() {
       <RoomTypeBookingSection
         roomTypes={pricing.roomTypes}
       />
+
+      <ReservationStatusSection />
 
       <section
         id="stay"
