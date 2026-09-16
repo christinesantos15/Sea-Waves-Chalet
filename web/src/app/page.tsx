@@ -1,5 +1,6 @@
 import CustomerPropertyMap from "@/components/customer-map/CustomerPropertyMap";
 import PublicPricingSection from "@/components/public/PublicPricingSection";
+import RoomTypeBookingSection from "@/components/public/RoomTypeBookingSection";
 import { getPublicPricing } from "@/lib/publicPricingApi";
 import { getPropertyMapLocations } from "@/lib/resortApi";
 
@@ -53,7 +54,7 @@ export default async function Home() {
             </a>
 
             <a
-              href="#explore"
+              href="#book"
               className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 sm:px-5"
             >
               Book your stay
@@ -84,10 +85,9 @@ export default async function Home() {
 
             <p className="mt-6 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
               Explore the resort from
-              above, choose a cottage
-              directly from the map,
-              check room availability,
-              and send your reservation
+              above, compare current
+              room types and rates,
+              then send your reservation
               request in one place.
             </p>
 
@@ -148,6 +148,10 @@ export default async function Home() {
         extraCharges={pricing.extraCharges}
       />
 
+      <RoomTypeBookingSection
+        roomTypes={pricing.roomTypes}
+      />
+
       <section
         id="stay"
         className="border-t border-slate-200 bg-white"
@@ -159,7 +163,7 @@ export default async function Home() {
             </p>
 
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              From the map to your
+              From room type to
               reservation request.
             </h2>
           </div>
@@ -168,18 +172,18 @@ export default async function Home() {
             {[
               [
                 "01",
-                "Choose a cottage",
-                "Explore the resort map and select the cottage that interests you.",
+                "Choose a room type",
+                "Compare the resort's room types, guest capacities, and current published rates.",
               ],
               [
                 "02",
-                "Check your dates",
-                "Enter your planned stay dates to see which rooms are available.",
+                "Choose dates and rate",
+                "Enter your stay dates and choose whether you want a room-only or breakfast rate.",
               ],
               [
                 "03",
                 "Send your request",
-                "Choose a room and send your contact details to the resort for confirmation.",
+                "Send your contact details. The resort reviews the request and assigns the exact cottage and room before confirmation.",
               ],
             ].map(
               ([

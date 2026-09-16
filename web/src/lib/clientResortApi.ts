@@ -178,3 +178,93 @@ export async function createReservationRequest(
 
   return body as CustomerReservationResponse;
 }
+
+export type RoomTypeRatePlan =
+  | "with_breakfast"
+  | "without_breakfast";
+
+export type RoomTypeReservationRequest = {
+  room_type_id: number;
+  rate_plan: RoomTypeRatePlan;
+
+  check_in: string;
+  check_out: string;
+
+  guest_count: number;
+
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+};
+
+export type RoomTypeReservationResponse = {
+  reservation_id: number;
+  reference: string;
+  status: string;
+
+  room_type_id: number;
+  room_type_name: string;
+
+  rate_plan: RoomTypeRatePlan;
+
+  quoted_rate: string;
+  nights: number;
+  total_amount: string;
+
+  check_in: string;
+  check_out: string;
+  guest_count: number;
+
+  message: string;
+};
+
+export async function createRoomTypeReservationRequest(
+  data: RoomTypeReservationRequest,
+): Promise<RoomTypeReservationResponse> {
+  const response = await fetch(
+    `${API_BASE_URL}/reservations/room-type-request`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    },
+  );
+
+  const body = await response
+    .json()
+    .catch(() => null);
+
+  if (!response.ok) {
+    if (
+      body &&
+      typeof body.detail === "string"
+    ) {
+      throw new Error(
+        body.detail,
+      );
+    }
+
+    if (
+      body &&
+      Array.isArray(body.detail)
+    ) {
+      const firstError =
+        body.detail[0]?.msg;
+
+      throw new Error(
+        typeof firstError === "string"
+          ? firstError
+          : "The reservation request is invalid.",
+      );
+    }
+
+    throw new Error(
+      `Failed to submit reservation: ${response.status}`,
+    );
+  }
+
+  return body as RoomTypeReservationResponse;
+}
