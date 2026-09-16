@@ -1,12 +1,20 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+)
 
+from app.schemas.cottage_media import (
+    CottageMediaResponse,
+)
 from app.schemas.room import RoomResponse
 
 
 class CottageResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
     id: int
     code: str
@@ -20,5 +28,8 @@ class CottageResponse(BaseModel):
     map_y: Decimal | None
 
 
-class CottageDetailResponse(CottageResponse):
+class CottageDetailResponse(
+    CottageResponse
+):
     rooms: list[RoomResponse]
+    media: list[CottageMediaResponse]

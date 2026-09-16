@@ -3,11 +3,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Amenity, Cottage, Room
+from app.models import (
+    Amenity,
+    Cottage,
+    CottageMedia,
+    Room,
+)
 from app.schemas.amenity import AmenityResponse
 from app.schemas.cottage import (
     CottageDetailResponse,
     CottageResponse,
+)
+from app.schemas.cottage_media import (
+    CottageMediaResponse,
 )
 from app.schemas.room import RoomResponse
 
@@ -58,7 +66,33 @@ def get_cottage(
         .order_by(Room.code)
     )
 
-    rooms = list(db.scalars(room_statement).all())
+    rooms = list(
+        db.scalars(
+            room_statement
+        ).all()
+    )
+
+    media_statement = (
+        select(CottageMedia)
+        .where(
+            CottageMedia.cottage_id
+            == cottage.id,
+            CottageMedia.is_active.is_(
+                True
+            ),
+        )
+        .order_by(
+            CottageMedia.is_cover.desc(),
+            CottageMedia.sort_order.asc(),
+            CottageMedia.id.asc(),
+        )
+    )
+
+    media = list(
+        db.scalars(
+            media_statement
+        ).all()
+    )
 
     return CottageDetailResponse(
         id=cottage.id,
@@ -72,8 +106,16 @@ def get_cottage(
         map_x=cottage.map_x,
         map_y=cottage.map_y,
         rooms=[
-            RoomResponse.model_validate(room)
+            RoomResponse.model_validate(
+                room
+            )
             for room in rooms
+        ],
+        media=[
+            CottageMediaResponse.model_validate(
+                item
+            )
+            for item in media
         ],
     )
 
