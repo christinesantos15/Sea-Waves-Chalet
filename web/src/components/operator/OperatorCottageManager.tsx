@@ -16,7 +16,13 @@ import {
   getOperatorCottages,
   updateCottageMedia,
   updateOperatorCottage,
+  updateOperatorRoomType,
 } from "@/lib/operatorCottageApi";
+
+import {
+  getRoomTypes,
+  type RoomTypePricing,
+} from "@/lib/operatorPricingApi";
 
 
 type CottageForm = {
@@ -215,6 +221,29 @@ export default function OperatorCottageManager() {
   );
 
 
+  const [
+    roomTypes,
+    setRoomTypes,
+  ] = useState<RoomTypePricing[]>([]);
+
+  const [
+    roomTypesLoading,
+    setRoomTypesLoading,
+  ] = useState(true);
+
+  const [
+    roomTypeSavingId,
+    setRoomTypeSavingId,
+  ] = useState<number | null>(null);
+
+  const [
+    roomTypeError,
+    setRoomTypeError,
+  ] = useState<string | null>(
+    null,
+  );
+
+
   const loadCottages =
     useCallback(
       async () => {
@@ -249,6 +278,41 @@ export default function OperatorCottageManager() {
     void loadCottages();
   }, [
     loadCottages,
+  ]);
+
+
+  const loadRoomTypes =
+    useCallback(
+      async () => {
+        setRoomTypesLoading(true);
+        setRoomTypeError(null);
+
+        try {
+          const data =
+            await getRoomTypes();
+
+          setRoomTypes(
+            data.filter(
+              (roomType) =>
+                roomType.is_active,
+            ),
+          );
+        } catch (err) {
+          setRoomTypeError(
+            errorMessage(err),
+          );
+        } finally {
+          setRoomTypesLoading(false);
+        }
+      },
+      [],
+    );
+
+
+  useEffect(() => {
+    void loadRoomTypes();
+  }, [
+    loadRoomTypes,
   ]);
 
 
@@ -512,6 +576,96 @@ export default function OperatorCottageManager() {
       setMediaError(
         errorMessage(err),
       );
+    }
+  }
+
+
+  async function handleRoomTypeAssignment(
+    roomId: number,
+    value: string,
+  ) {
+    if (selected === null) {
+      return;
+    }
+
+    const roomTypeId =
+      value === ""
+        ? null
+        : Number(value);
+
+    if (
+      roomTypeId !== null &&
+      !Number.isInteger(roomTypeId)
+    ) {
+      setRoomTypeError(
+        "Choose a valid room type.",
+      );
+
+      return;
+    }
+
+    setRoomTypeSavingId(roomId);
+    setRoomTypeError(null);
+    setSaveSuccess(null);
+
+    try {
+      const updated =
+        await updateOperatorRoomType(
+          selected.id,
+          roomId,
+          roomTypeId,
+        );
+
+      setSelected(
+        (current) => {
+          if (current === null) {
+            return current;
+          }
+
+          return {
+            ...current,
+            rooms:
+              current.rooms.map(
+                (room) =>
+                  room.id === updated.id
+                    ? updated
+                    : room,
+              ),
+          };
+        },
+      );
+
+      setCottages(
+        (current) =>
+          current.map(
+            (cottage) =>
+              cottage.id === selected.id
+                ? {
+                    ...cottage,
+                    rooms:
+                      cottage.rooms.map(
+                        (room) =>
+                          room.id ===
+                          updated.id
+                            ? updated
+                            : room,
+                      ),
+                  }
+                : cottage,
+          ),
+      );
+
+      setSaveSuccess(
+        updated.room_type_id === null
+          ? `${updated.code} is now unassigned.`
+          : `${updated.code} room type updated.`,
+      );
+    } catch (err) {
+      setRoomTypeError(
+        errorMessage(err),
+      );
+    } finally {
+      setRoomTypeSavingId(null);
     }
   }
 
@@ -1192,48 +1346,140 @@ export default function OperatorCottageManager() {
                 Cottage rooms
               </h2>
 
+              {roomTypeError && (
+                <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                  {roomTypeError}
+                </div>
+              )}
+
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {selected.rooms.map(
-                  (room) => (
-                    <div
-                      key={
-                        room.id
-                      }
-                      className="rounded-2xl border border-slate-200 p-4"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-semibold text-sky-700">
-                            {
-                              room.code
-                            }
-                          </p>
+                  (room) => {
+                    const assignedType =
+                      roomTypes.find(
+                        (roomType) =>
+                          roomType.id ===
+                          room.room_type_id,
+                      ) ?? null;
 
-                          <p className="mt-1 font-semibold text-slate-900">
-                            {
-                              room.name
-                            }
-                          </p>
+                    return (
+                      <div
+                        key={room.id}
+                        className="rounded-2xl border border-slate-200 p-4"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold text-sky-700">
+                              {room.code}
+                            </p>
+
+                            <p className="mt-1 font-semibold text-slate-900">
+                              {room.name}
+                            </p>
+                          </div>
+
+                          <span className="text-xs font-medium text-slate-500">
+                            {labelStatus(
+                              room.status,
+                            )}
+                          </span>
                         </div>
 
-                        <span className="text-xs font-medium text-slate-500">
-                          {labelStatus(
-                            room.status,
-                          )}
-                        </span>
-                      </div>
+                        <div className="mt-4 border-t border-slate-100 pt-4">
+                          <label className="block">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Room type
+                            </span>
 
-                      <div className="mt-3 text-sm text-slate-500">
-                        Capacity:{" "}
-                        {room.capacity ??
-                          "TBD"}
-                        <br />
-                        Rate:{" "}
-                        {room.base_rate ??
-                          "TBD"}
+                            <select
+                              value={
+                                room.room_type_id ??
+                                ""
+                              }
+                              onChange={(
+                                event,
+                              ) =>
+                                void handleRoomTypeAssignment(
+                                  room.id,
+                                  event.target.value,
+                                )
+                              }
+                              disabled={
+                                roomTypesLoading ||
+                                roomTypeSavingId ===
+                                  room.id
+                              }
+                              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <option value="">
+                                Unassigned
+                              </option>
+
+                              {roomTypes.map(
+                                (
+                                  roomType,
+                                ) => (
+                                  <option
+                                    key={
+                                      roomType.id
+                                    }
+                                    value={
+                                      roomType.id
+                                    }
+                                  >
+                                    {
+                                      roomType.name
+                                    }{" "}
+                                    ·{" "}
+                                    {
+                                      roomType.capacity
+                                    }{" "}
+                                    guests
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </label>
+
+                          {roomTypeSavingId ===
+                            room.id && (
+                            <p className="mt-2 text-xs text-sky-700">
+                              Saving assignment...
+                            </p>
+                          )}
+
+                          {assignedType && (
+                            <div className="mt-3 rounded-xl bg-sky-50 p-3">
+                              <p className="text-xs font-semibold text-sky-800">
+                                {
+                                  assignedType.name
+                                }
+                              </p>
+
+                              <p className="mt-1 text-xs text-sky-700">
+                                Capacity:{" "}
+                                {
+                                  assignedType.capacity
+                                }{" "}
+                                guests · Rates
+                                managed in Pricing
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-4 text-xs leading-5 text-slate-400">
+                          Legacy room capacity:{" "}
+                          {room.capacity ??
+                            "TBD"}
+                          <br />
+                          Legacy base rate:{" "}
+                          {room.base_rate ??
+                            "TBD"}
+                        </div>
                       </div>
-                    </div>
-                  ),
+                    );
+                  },
                 )}
               </div>
             </section>
