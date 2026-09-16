@@ -1,6 +1,7 @@
 from app.models.amenity import Amenity
 from app.models.auth_session import AuthSession
 from app.models.cottage import Cottage
+from app.models.cottage_media import CottageMedia
 from app.models.guest import Guest
 from app.models.housekeeping import HousekeepingTask
 from app.models.inquiry import Inquiry
@@ -15,6 +16,7 @@ __all__ = [
     "Amenity",
     "AuthSession",
     "Cottage",
+    "CottageMedia",
     "Guest",
     "HousekeepingTask",
     "Inquiry",
