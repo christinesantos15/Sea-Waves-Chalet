@@ -105,3 +105,7 @@ class OperatorCottageMediaResponse(
     CottageMediaResponse
 ):
     pass
+
+
+class OperatorRoomTypeAssignment(BaseModel):
+    room_type_id: int | None = None

@@ -18,11 +18,15 @@ from app.models import (
     Cottage,
     CottageMedia,
     Room,
+    RoomType,
 )
 from app.schemas.cottage_media import (
     CottageMediaResponse,
 )
+from app.schemas.room import RoomResponse
+
 from app.schemas.operator_cottage import (
+    OperatorRoomTypeAssignment,
     CottageMediaCreate,
     CottageMediaUpdate,
     OperatorCottageDetail,
@@ -653,6 +657,89 @@ def deactivate_cottage_media(
         media.is_cover = False
 
         db.commit()
+
+    except Exception:
+        db.rollback()
+        raise
+
+
+@router.patch(
+    "/{cottage_id}/rooms/{room_id}/room-type",
+    response_model=RoomResponse,
+)
+def assign_room_type(
+    cottage_id: int,
+    room_id: int,
+    data: OperatorRoomTypeAssignment,
+    db: Session = Depends(get_db),
+) -> RoomResponse:
+    try:
+        room = db.scalar(
+            select(Room)
+            .where(
+                Room.id == room_id,
+                Room.cottage_id
+                == cottage_id,
+            )
+            .with_for_update()
+        )
+
+        if room is None:
+            raise HTTPException(
+                status_code=(
+                    status.HTTP_404_NOT_FOUND
+                ),
+                detail=(
+                    "Room not found for this cottage."
+                ),
+            )
+
+        if data.room_type_id is not None:
+            room_type = db.get(
+                RoomType,
+                data.room_type_id,
+            )
+
+            if room_type is None:
+                raise HTTPException(
+                    status_code=(
+                        status.HTTP_404_NOT_FOUND
+                    ),
+                    detail=(
+                        "Room type not found."
+                    ),
+                )
+
+            if not room_type.is_active:
+                raise HTTPException(
+                    status_code=(
+                        status.HTTP_422_UNPROCESSABLE_CONTENT
+                    ),
+                    detail=(
+                        "Inactive room types "
+                        "cannot be assigned."
+                    ),
+                )
+
+        room.room_type_id = (
+            data.room_type_id
+        )
+
+        db.flush()
+
+        response = (
+            RoomResponse.model_validate(
+                room
+            )
+        )
+
+        db.commit()
+
+        return response
+
+    except HTTPException:
+        db.rollback()
+        raise
 
     except Exception:
         db.rollback()

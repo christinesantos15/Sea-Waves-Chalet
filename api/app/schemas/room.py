@@ -8,6 +8,7 @@ class RoomResponse(BaseModel):
 
     id: int
     cottage_id: int
+    room_type_id: int | None
     code: str
     name: str
     description: str | None

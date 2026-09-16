@@ -1,6 +1,7 @@
 export type OperatorRoom = {
   id: number;
   cottage_id: number;
+  room_type_id: number | null;
   code: string;
   name: string;
   description: string | null;
@@ -246,4 +247,35 @@ export async function deactivateCottageMedia(
       await readError(response),
     );
   }
+}
+
+
+export async function updateOperatorRoomType(
+  cottageId: number,
+  roomId: number,
+  roomTypeId: number | null,
+): Promise<OperatorRoom> {
+  const response = await fetch(
+    `${API_BASE_URL}/operator/cottages/${cottageId}/rooms/${roomId}/room-type`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        room_type_id: roomTypeId,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      await readError(response),
+    );
+  }
+
+  return response.json() as Promise<
+    OperatorRoom
+  >;
 }
