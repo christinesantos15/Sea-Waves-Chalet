@@ -58,6 +58,13 @@ export default function OperatorPage() {
               >
                 Manage cottages
               </Link>
+
+              <Link
+                href="/operator/pricing"
+                className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Manage pricing
+              </Link>
             </div>
           </header>
 
