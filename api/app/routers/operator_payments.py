@@ -40,6 +40,7 @@ router = APIRouter(
 COUNTED_PAYMENT_STATUS = "received"
 
 PAYMENT_ALLOWED_RESERVATION_STATUSES = (
+    "pending",
     "confirmed",
     "checked_in",
 )
@@ -280,8 +281,8 @@ def record_reservation_payment(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
                     "Payments may only be recorded "
-                    "for confirmed or checked-in "
-                    "reservations."
+                    "for pending, confirmed, or "
+                    "checked-in reservations."
                 ),
             )
 

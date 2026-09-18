@@ -1151,6 +1151,15 @@ export default function OperatorReservationQueue() {
 
                       {reservation.status ===
                         "pending" && (
+                        <OperatorPaymentPanel
+                          reservationId={
+                            reservation.id
+                          }
+                        />
+                      )}
+
+                      {reservation.status ===
+                        "pending" && (
                         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                           <button
                             type="button"
