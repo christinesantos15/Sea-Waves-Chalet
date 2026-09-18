@@ -142,13 +142,25 @@ def lookup_reservation_status(
         else None
     )
 
+    show_physical_assignment = (
+        reservation.status
+        in {
+            "confirmed",
+            "checked_in",
+            "checked_out",
+        }
+    )
+
     cottage = (
         db.get(
             Cottage,
             reservation.cottage_id,
         )
-        if reservation.cottage_id
-        is not None
+        if (
+            show_physical_assignment
+            and reservation.cottage_id
+            is not None
+        )
         else None
     )
 
@@ -157,8 +169,11 @@ def lookup_reservation_status(
             Room,
             reservation.room_id,
         )
-        if reservation.room_id
-        is not None
+        if (
+            show_physical_assignment
+            and reservation.room_id
+            is not None
+        )
         else None
     )
 

@@ -1,9 +1,13 @@
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.main import app
 from app.models import (
+    Cottage,
+    Reservation,
+    Room,
     RoomRate,
     RoomType,
 )
@@ -232,3 +236,151 @@ def test_lookup_requires_contact():
     )
 
     assert response.status_code == 422
+
+
+def assign_physical_room(
+    db,
+    reservation_data: dict,
+):
+    cottage = Cottage(
+        code="C01",
+        name="Cottage 1",
+        description=None,
+        capacity=None,
+        base_rate=None,
+        status="available",
+        is_active=True,
+        map_x=None,
+        map_y=None,
+    )
+
+    db.add(cottage)
+    db.flush()
+
+    room = Room(
+        cottage_id=cottage.id,
+        room_type_id=(
+            reservation_data[
+                "room_type_id"
+            ]
+        ),
+        code="R1",
+        name="Room 1",
+        description=None,
+        capacity=None,
+        base_rate=None,
+        status="available",
+        is_active=True,
+    )
+
+    db.add(room)
+    db.flush()
+
+    reservation = db.scalar(
+        select(Reservation).where(
+            Reservation.reference
+            == reservation_data[
+                "reference"
+            ]
+        )
+    )
+
+    assert reservation is not None
+
+    reservation.cottage_id = (
+        cottage.id
+    )
+    reservation.room_id = room.id
+
+    db.commit()
+    db.refresh(reservation)
+
+    return (
+        cottage,
+        room,
+        reservation,
+    )
+
+
+def test_pending_lookup_hides_physical_assignment(
+    db,
+):
+    created = create_reservation(
+        db,
+    )
+
+    cottage, room, reservation = (
+        assign_physical_room(
+            db,
+            created,
+        )
+    )
+
+    assert reservation.status == "pending"
+    assert (
+        reservation.cottage_id
+        == cottage.id
+    )
+    assert reservation.room_id == room.id
+
+    response = client.post(
+        "/reservations/status-lookup",
+        json={
+            "reference": (
+                created["reference"]
+            ),
+            "email": "guest@test.com",
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["status"] == "pending"
+    assert body["cottage_name"] is None
+    assert body["room_name"] is None
+
+
+def test_confirmed_lookup_shows_physical_assignment(
+    db,
+):
+    created = create_reservation(
+        db,
+    )
+
+    cottage, room, reservation = (
+        assign_physical_room(
+            db,
+            created,
+        )
+    )
+
+    reservation.status = "confirmed"
+
+    db.commit()
+    db.refresh(reservation)
+
+    response = client.post(
+        "/reservations/status-lookup",
+        json={
+            "reference": (
+                created["reference"]
+            ),
+            "email": "guest@test.com",
+        },
+    )
+
+    assert response.status_code == 200
+
+    body = response.json()
+
+    assert body["status"] == "confirmed"
+    assert (
+        body["cottage_name"]
+        == cottage.name
+    )
+    assert (
+        body["room_name"]
+        == room.name
+    )
